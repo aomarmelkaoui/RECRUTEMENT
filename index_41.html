@@ -1,0 +1,3706 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ONHYM - Plateforme de Recrutement</title>
+<meta name="description" content="Plateforme officielle de recrutement de l'Office National des Hydrocarbures et des Mines (ONHYM)">
+
+<!-- ============================================================
+     CONFIGURATION - A PERSONNALISER APRES CREATION DES GOOGLE SHEETS / FORMS
+     ============================================================ -->
+<script>
+const CONFIG = {
+  // URL Google Sheets ONHYM_Offres — publiée sur le web
+  // Format pubhtml (Feuille 1) — détection auto CSV/HTML dans fetchCSV()
+  // Lien fourni par l'utilisateur le 09/05/2026
+  SHEET_OFFRES_CSV: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQS-d-ikoRWeEGp13pdyirI-CO2bRAcqUCszqTCspbEkfndp0qNXsQOcOSwrNlIHB0URwV_EERt9kE5/pub?output=csv&gid=0",
+  // URL pubhtml alternative (si CSV bloqué)
+  SHEET_OFFRES_HTML: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQS-d-ikoRWeEGp13pdyirI-CO2bRAcqUCszqTCspbEkfndp0qNXsQOcOSwrNlIHB0URwV_EERt9kE5/pubhtml?gid=0&single=true",
+
+  // URL Google Sheets publie en CSV pour le suivi des candidatures
+  SHEET_SUIVI_CSV: "https://docs.google.com/spreadsheets/d/e/REMPLACER_ID/pub?output=csv&gid=1",
+
+  // URL Google Sheets publie en CSV pour les resultats
+  SHEET_RESULTATS_CSV: "https://docs.google.com/spreadsheets/d/e/REMPLACER_ID/pub?output=csv&gid=2",
+
+  // URL Google Form pour candidature (mode embed)
+  // Formulaire de candidature "Candidature ONHYM 2026"
+  // Formulaire "Candidature ONHYM 2026" — URL publique confirmée ✅
+  // Lien court : https://forms.gle/cJHjgLia5t2pGDtR8
+  // ID public  : 1FAIpQLSf-QGtgv45W7liIbTPstYRNcQb9m646Y_IOAtJLLshQkdw1oA
+  FORM_CANDIDATURE: "https://docs.google.com/forms/d/e/1FAIpQLSf-QGtgv45W7liIbTPstYRNcQb9m646Y_IOAtJLLshQkdw1oA/viewform?embedded=true",
+
+  // (optionnel) IDs des champs Google Forms pour pré-remplissage automatique
+  // Pour les obtenir : ouvrir le Form > 3 points > "Obtenir le lien pré-rempli", inspecter l'URL (entry.XXX)
+  FORM_PREFILL_CODE_ENTRY: "", // ex: "entry.123456789"
+  FORM_PREFILL_OFFRE_ENTRY: "", // ex: "entry.987654321"
+
+  // URL Google Form pour reclamation
+  // Formulaire "Réclamation ONHYM 2026" — URL publique confirmée ✅
+  // ID public : 1FAIpQLSccNe2Xs6NLBdIt5zY61P14O1PoRt915TfqPBqApim2gH82VQ
+  FORM_RECLAMATION: "https://docs.google.com/forms/d/e/1FAIpQLSccNe2Xs6NLBdIt5zY61P14O1PoRt915TfqPBqApim2gH82VQ/viewform?embedded=true",
+
+  // Mot de passe admin (cote client - a changer ou utiliser un backend)
+  // Authentification admin — stockage localStorage chiffré
+  // Ne pas modifier ici : utiliser le panneau "Gestion des comptes" dans l'espace admin
+  ADMIN_PASSWORD: "ONHYM2026", // compte legacy conservé pour compatibilité
+
+  // Informations institution
+  NOM_INSTITUTION: "ONHYM",
+  NOM_COMPLET: "Office National des Hydrocarbures et des Mines",
+  SITE_OFFICIEL: "https://www.onhym.com",
+  EMAIL_CONTACT: "recrutement@onhym.com"
+};
+</script>
+
+<style>
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  color: #1a2332;
+  background: #f4f7fb;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Couleurs institutionnelles ONHYM (bleu/or) */
+:root {
+  --primary: #003d7a;
+  --primary-dark: #002551;
+  --primary-light: #0056b3;
+  --accent: #d4a017;
+  --accent-light: #f2c94c;
+  --success: #2e7d32;
+  --warning: #ed6c02;
+  --danger: #c62828;
+  --gray-50: #f9fafc;
+  --gray-100: #eef2f7;
+  --gray-200: #dbe3ed;
+  --gray-300: #b8c5d6;
+  --gray-600: #556882;
+  --gray-800: #2c3a52;
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+  --shadow-lg: 0 10px 30px rgba(0,61,122,0.15);
+  --radius: 10px;
+}
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { color: var(--accent); }
+button { cursor: pointer; border: none; font-family: inherit; }
+img { max-width: 100%; display: block; }
+
+/* ============================================================
+   LANGUE / RTL
+   ============================================================ */
+.lang-switcher {
+  display: flex;
+  gap: 4px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 20px;
+  padding: 3px;
+}
+.lang-btn {
+  background: transparent;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.85em;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.lang-btn.active {
+  background: var(--accent);
+  color: var(--primary-dark);
+}
+.lang-btn:hover:not(.active) { background: rgba(255,255,255,0.1); }
+
+/* Support RTL (arabe) */
+html[dir="rtl"] body {
+  font-family: 'Noto Sans Arabic', 'Segoe UI', 'Tahoma', sans-serif;
+  text-align: right;
+}
+html[dir="rtl"] .offer-info,
+html[dir="rtl"] .header-top .container,
+html[dir="rtl"] .header-main .container,
+html[dir="rtl"] .offer-footer,
+html[dir="rtl"] .candidate-header p {
+  direction: rtl;
+}
+html[dir="rtl"] .timeline-item { flex-direction: row-reverse; }
+html[dir="rtl"] .timeline-item:not(:last-child)::before {
+  left: auto;
+  right: 22px;
+}
+html[dir="rtl"] .section-title h2::after { left: 50%; }
+html[dir="rtl"] .kpi-card { border-left: none; border-right: 5px solid var(--primary); }
+html[dir="rtl"] .kpi-card.accent { border-right-color: var(--accent); }
+html[dir="rtl"] .kpi-card.success { border-right-color: var(--success); }
+html[dir="rtl"] .kpi-card.warning { border-right-color: var(--warning); }
+html[dir="rtl"] .alert { border-left: none; border-right: 4px solid; }
+html[dir="rtl"] .form-instructions { border-left: none; border-right: 4px solid var(--accent); }
+html[dir="rtl"] table th, html[dir="rtl"] table td { text-align: right; }
+html[dir="rtl"] .process-card { direction: rtl; }
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  box-shadow: var(--shadow-md);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-top {
+  background: rgba(0,0,0,0.15);
+  padding: 6px 0;
+  font-size: 0.85em;
+}
+.header-top .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.header-top a { color: rgba(255,255,255,0.9); }
+.header-top a:hover { color: var(--accent-light); }
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.header-main {
+  padding: 15px 0;
+}
+
+.header-main .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.logo-icon {
+  width: 60px;
+  height: 60px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-weight: 900;
+  font-size: 1.3em;
+  letter-spacing: -1px;
+  box-shadow: var(--shadow-sm);
+}
+
+.logo-text h1 {
+  font-size: 1.4em;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.logo-text p {
+  font-size: 0.85em;
+  opacity: 0.9;
+}
+
+/* Navigation */
+nav {
+  background: var(--primary-dark);
+}
+nav .container {
+  display: flex;
+  flex-wrap: wrap;
+}
+nav a {
+  padding: 14px 22px;
+  color: white;
+  font-weight: 500;
+  font-size: 0.95em;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+nav a:hover, nav a.active {
+  background: rgba(255,255,255,0.08);
+  border-bottom-color: var(--accent);
+  color: white;
+}
+
+/* Menu burger mobile */
+.menu-toggle {
+  display: none;
+  background: transparent;
+  color: white;
+  font-size: 1.5em;
+  padding: 8px 12px;
+}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%),
+              url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3C/svg%3E");
+  color: white;
+  padding: 80px 0 100px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: var(--gray-50);
+  clip-path: polygon(0 100%, 100% 100%, 100% 0);
+}
+
+.hero h2 {
+  font-size: 2.4em;
+  font-weight: 700;
+  margin-bottom: 15px;
+  letter-spacing: -0.5px;
+}
+.hero .subtitle {
+  font-size: 1.15em;
+  opacity: 0.95;
+  max-width: 800px;
+  margin: 0 auto 30px;
+}
+
+.hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+  margin-top: 40px;
+  position: relative;
+  z-index: 2;
+}
+.stat-card {
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius);
+  padding: 20px 30px;
+  min-width: 180px;
+}
+.stat-number {
+  font-size: 2.5em;
+  font-weight: 800;
+  color: var(--accent-light);
+}
+.stat-label {
+  font-size: 0.95em;
+  opacity: 0.95;
+}
+
+/* ============================================================
+   SECTIONS GENERIQUES
+   ============================================================ */
+section {
+  padding: 60px 0;
+}
+section.section-alt {
+  background: white;
+}
+
+.section-title {
+  text-align: center;
+  margin-bottom: 50px;
+}
+.section-title h2 {
+  color: var(--primary);
+  font-size: 2em;
+  font-weight: 700;
+  margin-bottom: 10px;
+  position: relative;
+  display: inline-block;
+}
+.section-title h2::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.section-title p {
+  color: var(--gray-600);
+  margin-top: 20px;
+  font-size: 1.05em;
+}
+
+/* Page content area - toggling sections */
+.page {
+  display: none;
+  animation: fadeIn 0.4s ease;
+}
+.page.active {
+  display: block;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   CARTES PROCESSUS (page d'accueil)
+   ============================================================ */
+.process-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-top: 40px;
+}
+.process-card {
+  background: white;
+  padding: 30px 20px;
+  border-radius: var(--radius);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s;
+  border-top: 4px solid var(--primary);
+  position: relative;
+}
+.process-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+  border-top-color: var(--accent);
+}
+.process-number {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  color: var(--primary-dark);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1em;
+  border: 3px solid white;
+}
+.process-icon {
+  font-size: 2.5em;
+  margin: 10px 0 12px;
+}
+.process-card h3 {
+  color: var(--primary);
+  font-size: 1.1em;
+  margin-bottom: 8px;
+}
+.process-card p {
+  color: var(--gray-600);
+  font-size: 0.9em;
+}
+
+/* ============================================================
+   CTA BOUTONS
+   ============================================================ */
+.btn {
+  display: inline-block;
+  padding: 12px 28px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 1em;
+  transition: all 0.25s;
+  text-align: center;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--primary-dark);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover {
+  background: var(--accent-light);
+  color: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.btn-outline {
+  background: transparent;
+  color: white;
+  border-color: white;
+}
+.btn-outline:hover {
+  background: white;
+  color: var(--primary);
+}
+.btn-secondary {
+  background: var(--primary);
+  color: white;
+}
+.btn-secondary:hover {
+  background: var(--primary-dark);
+  color: white;
+}
+.btn-ghost {
+  background: var(--gray-100);
+  color: var(--primary);
+}
+.btn-ghost:hover {
+  background: var(--gray-200);
+}
+
+.hero-cta {
+  margin-top: 30px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
+}
+
+/* ============================================================
+   AVIS DE CONCOURS - CARTES POSTES
+   ============================================================ */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+.filter-btn {
+  padding: 8px 20px;
+  background: white;
+  border: 2px solid var(--gray-200);
+  border-radius: 30px;
+  color: var(--gray-800);
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.offers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 25px;
+}
+.offer-card {
+  background: white;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--gray-200);
+}
+.offer-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+.offer-header {
+  padding: 20px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white;
+  border-bottom: 4px solid var(--accent);
+}
+.offer-category {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--primary-dark);
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: 700;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.offer-title {
+  font-size: 1.2em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.offer-body {
+  padding: 20px;
+  flex-grow: 1;
+}
+.offer-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 0.9em;
+  border-bottom: 1px dashed var(--gray-200);
+}
+.offer-info:last-child { border-bottom: none; }
+.offer-info strong { color: var(--gray-800); }
+.offer-info span { color: var(--gray-600); }
+.offer-footer {
+  padding: 15px 20px;
+  background: var(--gray-50);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.deadline-badge {
+  font-size: 0.85em;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* ============================================================
+   FORMULAIRE / EMBED GOOGLE FORMS
+   ============================================================ */
+.form-wrapper {
+  background: white;
+  padding: 30px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  max-width: 900px;
+  margin: 0 auto;
+}
+.form-wrapper iframe {
+  width: 100%;
+  min-height: 850px;
+  border: none;
+  border-radius: 8px;
+}
+.form-instructions {
+  background: #fff4d6;
+  border-left: 4px solid var(--accent);
+  padding: 18px 22px;
+  border-radius: 6px;
+  margin-bottom: 25px;
+  color: var(--gray-800);
+}
+.form-instructions h4 {
+  color: var(--primary);
+  margin-bottom: 10px;
+}
+.form-instructions ul {
+  margin-left: 20px;
+  margin-top: 8px;
+}
+.form-instructions li { margin-bottom: 4px; font-size: 0.95em; }
+
+/* ============================================================
+   ESPACE CANDIDAT - SUIVI
+   ============================================================ */
+.suivi-form {
+  max-width: 500px;
+  margin: 0 auto 40px;
+  background: white;
+  padding: 35px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.form-group {
+  margin-bottom: 18px;
+}
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--gray-800);
+  font-size: 0.95em;
+}
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 2px solid var(--gray-200);
+  border-radius: 8px;
+  font-size: 1em;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.suivi-result {
+  max-width: 900px;
+  margin: 30px auto 0;
+  display: none;
+}
+.candidate-card {
+  background: white;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+.candidate-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white;
+  padding: 25px;
+}
+.candidate-header h3 {
+  font-size: 1.4em;
+  margin-bottom: 5px;
+}
+.candidate-header .code {
+  background: var(--accent);
+  color: var(--primary-dark);
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+/* Timeline des phases */
+.timeline {
+  padding: 30px 25px;
+}
+.timeline-item {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 8px;
+  position: relative;
+  padding-bottom: 20px;
+}
+.timeline-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 22px;
+  top: 45px;
+  bottom: 0;
+  width: 2px;
+  background: var(--gray-200);
+}
+.timeline-dot {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: var(--gray-200);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  z-index: 1;
+  font-size: 1.1em;
+}
+.timeline-dot.done { background: var(--success); }
+.timeline-dot.current { background: var(--accent); color: var(--primary-dark); animation: pulse 2s infinite; }
+.timeline-dot.failed { background: var(--danger); }
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,160,23,0.6); }
+  50% { box-shadow: 0 0 0 12px rgba(212,160,23,0); }
+}
+
+.timeline-content h4 {
+  color: var(--primary);
+  margin-bottom: 3px;
+  font-size: 1.05em;
+}
+.timeline-content p {
+  font-size: 0.92em;
+  color: var(--gray-600);
+}
+.status-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.status-tag.pending { background: var(--gray-100); color: var(--gray-600); }
+.status-tag.done { background: #e8f5e9; color: var(--success); }
+.status-tag.current { background: #fff4d6; color: var(--warning); }
+.status-tag.failed { background: #ffebee; color: var(--danger); }
+
+/* ============================================================
+   ESPACE ADMIN
+   ============================================================ */
+.login-box {
+  max-width: 450px;
+  margin: 0 auto;
+  background: white;
+  padding: 40px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+.login-box .icon { font-size: 3em; margin-bottom: 10px; }
+.login-box h3 { color: var(--primary); margin-bottom: 20px; }
+
+.dashboard {
+  display: none;
+}
+.dashboard.visible {
+  display: block !important;
+}
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+.kpi-card {
+  background: white;
+  padding: 22px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border-left: 5px solid var(--primary);
+}
+.kpi-card.accent { border-left-color: var(--accent); }
+.kpi-card.success { border-left-color: var(--success); }
+.kpi-card.warning { border-left-color: var(--warning); }
+.kpi-card .value {
+  font-size: 2em;
+  font-weight: 800;
+  color: var(--primary);
+}
+.kpi-card .label {
+  color: var(--gray-600);
+  font-size: 0.9em;
+  margin-top: 3px;
+}
+
+/* Table admin */
+.table-wrapper {
+  background: white;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  margin-top: 20px;
+}
+.table-header {
+  padding: 20px;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.table-header h3 { font-size: 1.1em; }
+.search-box {
+  display: flex;
+  gap: 8px;
+}
+.search-box input {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  min-width: 220px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+table th, table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-200);
+  font-size: 0.92em;
+}
+table th {
+  background: var(--gray-50);
+  font-weight: 700;
+  color: var(--gray-800);
+  text-transform: uppercase;
+  font-size: 0.8em;
+  letter-spacing: 0.5px;
+}
+table tbody tr:hover { background: var(--gray-50); }
+.table-scroll {
+  overflow-x: auto;
+  max-height: 600px;
+}
+
+/* ============================================================
+   RESULTATS
+   ============================================================ */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 25px;
+  border-bottom: 2px solid var(--gray-200);
+}
+.tab-btn {
+  padding: 12px 22px;
+  background: transparent;
+  color: var(--gray-600);
+  font-weight: 600;
+  font-size: 0.95em;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+}
+.tab-btn:hover { color: var(--primary); }
+.tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--accent);
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; animation: fadeIn 0.3s; }
+
+/* ============================================================
+   ALERTES / MESSAGES
+   ============================================================ */
+.alert {
+  padding: 16px 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+  border-left: 4px solid;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.alert-info { background: #e3f2fd; border-color: var(--primary); color: var(--primary-dark); }
+.alert-success { background: #e8f5e9; border-color: var(--success); color: #1b5e20; }
+.alert-warning { background: #fff4d6; border-color: var(--warning); color: #7f4a0a; }
+.alert-danger { background: #ffebee; border-color: var(--danger); color: #7f1d1d; }
+.alert-icon { font-size: 1.3em; flex-shrink: 0; }
+
+.loader {
+  text-align: center;
+  padding: 40px;
+  color: var(--gray-600);
+}
+.spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer {
+  background: var(--primary-dark);
+  color: white;
+  padding: 50px 0 20px;
+  margin-top: 60px;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 30px;
+  margin-bottom: 30px;
+}
+.footer-col h4 {
+  color: var(--accent);
+  margin-bottom: 15px;
+  font-size: 1.05em;
+}
+.footer-col ul { list-style: none; }
+.footer-col li { margin-bottom: 8px; font-size: 0.93em; opacity: 0.9; }
+.footer-col a { color: rgba(255,255,255,0.9); }
+.footer-col a:hover { color: var(--accent-light); }
+.footer-bottom {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 20px;
+  text-align: center;
+  font-size: 0.88em;
+  opacity: 0.8;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  .menu-toggle { display: block; }
+  nav .container { flex-direction: column; display: none; }
+  nav .container.open { display: flex; }
+  nav a { width: 100%; padding: 12px 20px; }
+  .hero h2 { font-size: 1.6em; }
+  .hero .subtitle { font-size: 1em; }
+  .section-title h2 { font-size: 1.5em; }
+  .header-main .container { flex-direction: column; gap: 10px; }
+  .logo-text h1 { font-size: 1.1em; }
+  .hero-stats { gap: 15px; }
+  .stat-card { min-width: 140px; padding: 15px; }
+  .stat-number { font-size: 1.8em; }
+  section { padding: 40px 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+<header>
+  <div class="header-top">
+    <div class="container">
+      <span>📞 +212 5 37 69 87 00 &nbsp; | &nbsp; ✉️ recrutement@onhym.com</span>
+      <div style="display:flex; align-items:center; gap:15px;">
+        <span><a href="https://www.onhym.com" target="_blank">🌐 www.onhym.com</a></span>
+        <div class="lang-switcher" role="group" aria-label="Sélecteur de langue">
+          <button class="lang-btn active" id="lang-fr" onclick="switchLang('fr')">FR</button>
+          <button class="lang-btn" id="lang-ar" onclick="switchLang('ar')">عربية</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="header-main">
+    <div class="container">
+      <div class="logo-area">
+        <div class="logo-icon">ONHYM</div>
+        <div class="logo-text">
+          <h1 data-i18n="brand_title">ONHYM - Recrutement</h1>
+          <p data-i18n="brand_subtitle">Office National des Hydrocarbures et des Mines</p>
+        </div>
+      </div>
+      <button class="menu-toggle" onclick="toggleMenu()" data-i18n="menu_toggle">☰ Menu</button>
+    </div>
+  </div>
+  <nav>
+    <div class="container" id="mainNav">
+      <span id="navLockedMsg" style="color:rgba(255,255,255,0.6); font-size:0.88em; padding:14px 22px; display:inline-block;">🔒 Veuillez vous connecter pour accéder à la plateforme</span>
+      <div id="navLinks" style="display:none; contents:contents;">
+      <a onclick="showPage('accueil')" data-i18n="nav_home">🏠 Accueil</a>
+      <a onclick="showPage('offres')" data-i18n="nav_offers">📋 Avis de concours</a>
+      <a onclick="showPage('candidature')" data-i18n="nav_apply">✍️ Postuler</a>
+      <a onclick="showPage('suivi')" data-i18n="nav_track">🔍 Suivre ma candidature</a>
+      <a onclick="showPage('resultats')" data-i18n="nav_results">🏆 Résultats</a>
+      <a onclick="showPage('reclamation')" data-i18n="nav_claim">⚠️ Réclamation</a>
+      <a onclick="showPage('admin')" class="active" data-i18n="nav_admin">🔒 Espace Admin</a>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<!-- ============================================================
+     PAGE : ACCUEIL
+     ============================================================ -->
+<div id="page-accueil" class="page">
+  <section class="hero">
+    <div class="container">
+      <h2 data-i18n="hero_title">Plateforme de Recrutement ONHYM</h2>
+      <p class="subtitle" data-i18n="hero_subtitle">
+        Bienvenue sur la plateforme officielle de recrutement de l'Office National des Hydrocarbures et des Mines.
+        Rejoignez une institution stratégique du Royaume du Maroc au cœur du secteur énergétique et minier.
+      </p>
+      <div class="hero-cta">
+        <button class="btn btn-primary" onclick="showPage('offres')" data-i18n="hero_cta_offers">📋 Consulter les postes</button>
+        <button class="btn btn-outline" onclick="showPage('candidature')" data-i18n="hero_cta_apply">✍️ Postuler maintenant</button>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-card">
+          <div class="stat-number">30</div>
+          <div class="stat-label" data-i18n="stat_total">Postes à pourvoir</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">11</div>
+          <div class="stat-label" data-i18n="stat_cadres">Ingénieurs & Cadres</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">9</div>
+          <div class="stat-label" data-i18n="stat_maitrises">Techniciens (BAC+2)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">10</div>
+          <div class="stat-label" data-i18n="stat_classes">Postes Classés (BAC)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bannière admin connecté (visible seulement après connexion) -->
+  <div id="adminWelcomeBanner" class="alert alert-success" style="display:none; margin:0; border-radius:0; border-left:none; border-top:none; border-bottom:4px solid var(--accent); background:#e8f5e9; padding:12px 40px;">
+    <span class="alert-icon">🔒</span>
+    <div id="adminWelcomeMsg" style="font-size:0.95em;"></div>
+  </div>
+
+  <section class="section-alt">
+    <div class="container">
+      <div class="section-title">
+        <h2 data-i18n="process_title">Notre processus de recrutement</h2>
+        <p data-i18n="process_subtitle">Un processus transparent, objectif et équitable en 5 phases</p>
+      </div>
+      <div class="process-grid">
+        <div class="process-card">
+          <div class="process-number">1</div>
+          <div class="process-icon">📢</div>
+          <h3 data-i18n="phase1_title">Cadrage & Publication</h3>
+          <p data-i18n="phase1_desc">Publication des avis de concours pour 15 jours minimum</p>
+        </div>
+        <div class="process-card">
+          <div class="process-number">2</div>
+          <div class="process-icon">📁</div>
+          <h3 data-i18n="phase2_title">Réception & Présélection</h3>
+          <p data-i18n="phase2_desc">Analyse des dossiers selon les critères définis</p>
+        </div>
+        <div class="process-card">
+          <div class="process-number">3</div>
+          <div class="process-icon">📝</div>
+          <h3 data-i18n="phase3_title">Épreuve écrite</h3>
+          <p data-i18n="phase3_desc">Pour la catégorie 2 (5 cadres, 9 maîtrises, 10 classés)</p>
+        </div>
+        <div class="process-card">
+          <div class="process-number">4</div>
+          <div class="process-icon">🎤</div>
+          <h3 data-i18n="phase4_title">Test Oral 1</h3>
+          <p data-i18n="phase4_desc">Tests psychotechniques + premier entretien</p>
+        </div>
+        <div class="process-card">
+          <div class="process-number">5</div>
+          <div class="process-icon">🏆</div>
+          <h3 data-i18n="phase5_title">Test Oral 2</h3>
+          <p data-i18n="phase5_desc">Entretien final avec la commission ONHYM</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="section-title">
+        <h2 data-i18n="why_title">Pourquoi rejoindre l'ONHYM ?</h2>
+      </div>
+      <div class="process-grid">
+        <div class="process-card">
+          <div class="process-icon">⚡</div>
+          <h3 data-i18n="why1_title">Secteur stratégique</h3>
+          <p data-i18n="why1_desc">Au cœur de l'énergie et des mines du Maroc</p>
+        </div>
+        <div class="process-card">
+          <div class="process-icon">🌍</div>
+          <h3 data-i18n="why2_title">Projets d'envergure</h3>
+          <p data-i18n="why2_desc">Gazoduc Afrique-Atlantique, hydrogène vert, exploration</p>
+        </div>
+        <div class="process-card">
+          <div class="process-icon">📈</div>
+          <h3 data-i18n="why3_title">Développement de carrière</h3>
+          <p data-i18n="why3_desc">Formation continue et évolution professionnelle</p>
+        </div>
+        <div class="process-card">
+          <div class="process-icon">🤝</div>
+          <h3 data-i18n="why4_title">Équipe experte</h3>
+          <p data-i18n="why4_desc">Plus de 900 collaborateurs hautement qualifiés</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================
+     PAGE : AVIS DE CONCOURS
+     ============================================================ -->
+<div id="page-offres" class="page">
+  <section>
+    <div class="container">
+      <div class="section-title">
+        <h2 data-i18n="offers_title">Avis de concours</h2>
+        <p data-i18n="offers_subtitle">Consultez les 30 postes ouverts au recrutement</p>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+        <div id="offresLastUpdate" style="font-size:0.82em; color:var(--gray-600);"></div>
+        <button class="btn btn-ghost" style="padding:6px 14px; font-size:0.85em;" onclick="reloadOffres()">🔄 Actualiser les offres</button>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterOffers('all', this)" id="filter-all" data-i18n="filter_all">Tous (30)</button>
+        <button class="filter-btn" onclick="filterOffers('cadre', this)" id="filter-cadre" data-i18n="filter_cadre">🎓 Ingénieurs & Cadres (11)</button>
+        <button class="filter-btn" onclick="filterOffers('maitrise', this)" id="filter-maitrise" data-i18n="filter_maitrise">📘 Maîtrises BAC+2 (9)</button>
+        <button class="filter-btn" onclick="filterOffers('classe', this)" id="filter-classe" data-i18n="filter_classe">📗 Classés BAC (10)</button>
+      </div>
+      <div id="offersContainer">
+        <div class="loader"><div class="spinner"></div><p>Chargement des offres...</p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================
+     PAGE : CANDIDATURE
+     ============================================================ -->
+<div id="page-candidature" class="page">
+  <section>
+    <div class="container">
+      <div class="section-title">
+        <h2>Formulaire de candidature</h2>
+        <p>Candidature ONHYM 2026 — Remplissez attentivement le formulaire ci-dessous</p>
+      </div>
+      <div class="form-wrapper">
+        <div class="form-instructions">
+          <h4>📋 Avant de postuler, préparez :</h4>
+          <ul>
+            <li>Votre CV à jour (format PDF)</li>
+            <li>Copie du/des diplôme(s) (PDF)</li>
+            <li>Attestations de travail / stages (PDF)</li>
+            <li>Copie de la CIN (PDF)</li>
+            <li>Photo d'identité récente</li>
+          </ul>
+          <p style="margin-top: 10px;"><strong>⚠️ Un accusé de réception vous sera envoyé par email après soumission.</strong></p>
+        </div>
+        <iframe id="formCandidature" src="about:blank" title="Formulaire de candidature - Candidature ONHYM 2026">
+          Chargement du formulaire...
+        </iframe>
+        <div style="text-align:right; margin-top:8px;">
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLSf-QGtgv45W7liIbTPstYRNcQb9m646Y_IOAtJLLshQkdw1oA/viewform" target="_blank" style="font-size:0.85em; color:var(--gray-600);">
+            🔗 Ouvrir le formulaire dans un nouvel onglet
+          </a>
+        </div>
+        <div class="alert alert-info" id="formFallback" style="display:none;">
+          <span class="alert-icon">ℹ️</span>
+          <div>
+            <strong>Formulaire "Candidature ONHYM 2026" configuré.</strong><br>
+            Si le formulaire ne s'affiche pas, <a href="https://docs.google.com/forms/d/e/1FAIpQLSf-QGtgv45W7liIbTPstYRNcQb9m646Y_IOAtJLLshQkdw1oA/viewform" target="_blank" style="color:var(--primary); font-weight:600;">cliquez ici pour l'ouvrir dans un nouvel onglet ↗</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================
+     PAGE : SUIVI DE CANDIDATURE
+     ============================================================ -->
+<div id="page-suivi" class="page">
+  <section>
+    <div class="container">
+      <div class="section-title">
+        <h2>Suivi de ma candidature</h2>
+        <p>Saisissez votre code candidat et votre email pour consulter l'état de votre dossier</p>
+      </div>
+      <form class="suivi-form" onsubmit="checkCandidature(event)">
+        <div class="form-group">
+          <label for="codeCandidat">Code candidat *</label>
+          <input type="text" id="codeCandidat" placeholder="Ex: ONHYM-2026-001" required>
+        </div>
+        <div class="form-group">
+          <label for="emailCandidat">Email *</label>
+          <input type="email" id="emailCandidat" placeholder="votre.email@exemple.com" required>
+        </div>
+        <button type="submit" class="btn btn-secondary" style="width:100%;">🔍 Consulter mon dossier</button>
+      </form>
+      <div id="suiviResult" class="suivi-result"></div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================
+     PAGE : RESULTATS
+     ============================================================ -->
+<div id="page-resultats" class="page">
+  <section>
+    <div class="container">
+      <div class="section-title">
+        <h2>Résultats des phases du recrutement</h2>
+        <p>Consultez les résultats officiels validés par l'ONHYM</p>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('preselection', this)">📁 Présélection</button>
+        <button class="tab-btn" onclick="showTab('ecrit', this)">📝 Épreuve écrite</button>
+        <button class="tab-btn" onclick="showTab('oral1', this)">🎤 Oral 1</button>
+        <button class="tab-btn" onclick="showTab('oral2', this)">🏆 Oral 2 (Final)</button>
+      </div>
+      <div id="tab-preselection" class="tab-content active">
+        <div id="resultsPreselection" class="loader"><div class="spinner"></div><p>Chargement...</p></div>
+      </div>
+      <div id="tab-ecrit" class="tab-content">
+        <div id="resultsEcrit" class="loader"><div class="spinner"></div><p>Chargement...</p></div>
+      </div>
+      <div id="tab-oral1" class="tab-content">
+        <div id="resultsOral1" class="loader"><div class="spinner"></div><p>Chargement...</p></div>
+      </div>
+      <div id="tab-oral2" class="tab-content">
+        <div id="resultsOral2" class="loader"><div class="spinner"></div><p>Chargement...</p></div>
+        </div>
+        </div><!-- fin adminPanel-candidats -->
+
+
+
+
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================
+     PAGE : RECLAMATION
+     ============================================================ -->
+<div id="page-reclamation" class="page">
+  <section>
+    <div class="container">
+      <div class="section-title">
+        <h2>Déposer une réclamation</h2>
+        <p>Conformément aux principes de transparence et d'équité</p>
+      </div>
+      <div class="form-wrapper">
+        <div class="form-instructions">
+          <h4>ℹ️ Informations importantes :</h4>
+          <ul>
+            <li>Toutes les réclamations sont traitées dans l'ordre de réception</li>
+            <li>Vous recevrez une réponse par email dans les délais prévus par le cahier des charges</li>
+            <li>Merci de préciser votre code candidat pour un traitement plus rapide</li>
+          </ul>
+        </div>
+        <iframe id="formReclamation" src="about:blank" title="Formulaire de réclamation ONHYM 2026">
+          Chargement du formulaire...
+        </iframe>
+        <div style="text-align:right; margin-top:8px;">
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLSccNe2Xs6NLBdIt5zY61P14O1PoRt915TfqPBqApim2gH82VQ/viewform" target="_blank" style="font-size:0.85em; color:var(--gray-600);">
+            🔗 Ouvrir le formulaire de réclamation dans un nouvel onglet
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================
+     PAGE : ADMIN
+     ============================================================ -->
+<div id="page-admin" class="page active">
+  <section>
+    <div class="container">
+      <div class="section-title">
+        <h2>Espace Administrateur</h2>
+        <p>Accès réservé aux agents ONHYM et prestataire</p>
+      </div>
+      <div id="loginBox" class="login-box">
+        <div class="icon">🔒</div>
+        <h3>Connexion sécurisée</h3>
+        <div id="loginError" class="alert alert-danger" style="display:none; margin-bottom:15px; text-align:left;">
+          <span class="alert-icon">❌</span>
+          <div id="loginErrorMsg">Identifiants incorrects.</div>
+        </div>
+        <div id="loginLocked" class="alert alert-warning" style="display:none; margin-bottom:15px; text-align:left;">
+          <span class="alert-icon">⚠️</span>
+          <div>Compte bloqué après 5 tentatives. Réessayez dans <strong id="lockCountdown">60</strong>s.
+            <br><button onclick="resetLoginBlock()" style="margin-top:6px; background:#D4A017; border:none; color:#002551; padding:4px 12px; border-radius:4px; cursor:pointer; font-weight:600; font-size:12px;">🔓 Débloquer maintenant</button>
+          </div>
+        </div>
+        <form onsubmit="loginAdmin(event)" id="loginForm">
+          <div class="form-group">
+            <label for="adminLogin">Identifiant</label>
+            <input type="text" id="adminLogin" placeholder="Ex: drh.onhym" autocomplete="username" required>
+          </div>
+          <div class="form-group">
+            <label for="adminPassword">Mot de passe</label>
+            <div style="position:relative;">
+              <input type="password" id="adminPassword" autocomplete="current-password" required style="padding-right:44px;">
+              <button type="button" onclick="togglePwdVisibility()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1em;" title="Afficher/Masquer">👁</button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-secondary" style="width:100%;" id="loginBtn">Se connecter</button>
+        </form>
+        <p style="margin-top:15px; font-size:0.85em; color:var(--gray-600);">
+          Contactez la DRH pour obtenir vos identifiants
+        </p>
+      </div>
+
+      <div id="adminDashboard" class="dashboard">
+        <!-- KPI -->
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="value" id="kpiTotal">--</div><div class="label">Candidatures totales</div></div>
+          <div class="kpi-card accent"><div class="value" id="kpiPreselect">--</div><div class="label">Présélectionnés</div></div>
+          <div class="kpi-card success"><div class="value" id="kpiAdmis">--</div><div class="label">Admis (final)</div></div>
+          <div class="kpi-card warning"><div class="value" id="kpiReclam">--</div><div class="label">Réclamations</div></div>
+        </div>
+
+        <!-- Barre actions dashboard -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+          <div style="font-size:0.9em; color:var(--gray-600);">
+            Connecté en tant que : <strong id="currentUserDisplay" style="color:var(--primary);"></strong>
+            &nbsp;|&nbsp; Rôle : <span id="currentRoleDisplay" style="font-weight:600;"></span>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="showAdminPanel('candidats')" id="btn-panel-candidats">📋 Candidats</button>
+            <button class="btn btn-ghost" onclick="showAdminPanel('postes')" id="btn-panel-postes">📝 Offres de postes</button>
+            <button class="btn btn-ghost" onclick="showAdminPanel('comptes')" id="btn-panel-comptes">👥 Comptes</button>
+            <button class="btn btn-ghost" onclick="logoutAdmin()">🚪 Déconnexion</button>
+          </div>
+        </div>
+
+        <!-- Panel : Liste des candidats -->
+        <div id="adminPanel-candidats">
+        <!-- Table candidats -->
+        <div class="table-wrapper">
+          <div class="table-header">
+            <h3>📋 Liste des candidats</h3>
+            <div class="search-box">
+              <input type="text" id="searchAdmin" placeholder="🔍 Rechercher..." oninput="filterAdminTable()">
+              <button class="btn btn-primary" onclick="exportCSV()">⬇ Export CSV</button>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table id="adminTable">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Nom & Prénom</th>
+                  <th>Email</th>
+                  <th>Poste</th>
+                  <th>Catégorie</th>
+                  <th>Diplôme</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody">
+                <tr><td colspan="7" style="text-align:center; padding:30px;">Chargement des données...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        </div><!-- fin adminPanel-candidats -->
+
+        <!-- Panel : Gestion des comptes admin -->
+        <div id="adminPanel-comptes" style="display:none;">
+          <div class="table-wrapper">
+            <div class="table-header" style="background:var(--primary-dark);">
+              <h3>👥 Gestion des comptes administrateurs</h3>
+              <button class="btn btn-primary" onclick="showAddAccountModal()">+ Ajouter un compte</button>
+            </div>
+            <div class="table-scroll">
+              <table id="accountsTable">
+                <thead>
+                  <tr>
+                    <th>Identifiant</th>
+                    <th>Nom complet</th>
+                    <th>Rôle</th>
+                    <th>Dernière connexion</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="accountsTableBody">
+                  <tr><td colspan="6" style="text-align:center; padding:20px;">Chargement...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Formulaire ajout/édition compte -->
+          <div id="accountModal" style="display:none; margin-top:25px;">
+            <div class="form-wrapper" style="max-width:600px;">
+              <h3 style="color:var(--primary); margin-bottom:20px;" id="accountModalTitle">➕ Ajouter un compte</h3>
+              <div class="alert alert-warning" style="margin-bottom:20px;">
+                <span class="alert-icon">⚠️</span>
+                <div>Les mots de passe sont stockés en local (localStorage). Pour une sécurité maximale, utilisez un serveur backend.</div>
+              </div>
+              <form onsubmit="saveAccount(event)" id="accountForm">
+                <input type="hidden" id="accountEditId">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                  <div class="form-group">
+                    <label>Identifiant *</label>
+                    <input type="text" id="accLogin" placeholder="Ex: drh.onhym" required>
+                  </div>
+                  <div class="form-group">
+                    <label>Nom complet *</label>
+                    <input type="text" id="accName" placeholder="Ex: Direction RH" required>
+                  </div>
+                  <div class="form-group">
+                    <label>Mot de passe *</label>
+                    <div style="position:relative;">
+                      <input type="password" id="accPassword" placeholder="Min. 8 caractères">
+                      <button type="button" onclick="togglePwdVisibility('accPassword')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;">👁</button>
+                    </div>
+                    <small style="color:var(--gray-600);">Laisser vide pour ne pas modifier (en édition)</small>
+                  </div>
+                  <div class="form-group">
+                    <label>Rôle *</label>
+                    <select id="accRole">
+                      <option value="admin">Admin complet</option>
+                      <option value="lecture">Lecture seule</option>
+                      <option value="drh">DRH</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                  <button type="submit" class="btn btn-secondary">💾 Enregistrer</button>
+                  <button type="button" class="btn btn-ghost" onclick="hideAccountModal()">Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div><!-- fin adminPanel-comptes -->
+
+        <!-- ========== PANEL ÉDITEUR DE POSTES ========== -->
+        <div id="adminPanel-postes" style="display:none;">
+
+          <!-- Barre outils éditeur -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0; color:var(--primary);">📝 Gestion des offres de postes</h3>
+              <p style="margin:4px 0 0; font-size:0.85em; color:var(--gray-600);">Ajoutez, modifiez ou supprimez les offres. Les modifications sont sauvegardées localement.</p>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="showPosteForm()">➕ Nouveau poste</button>
+              <button class="btn btn-ghost" onclick="exportPostesCSV()">⬇ Export CSV</button>
+              <button class="btn btn-ghost" onclick="importPostesFromDemo()">🔄 Recharger depuis Sheets</button>
+            </div>
+          </div>
+
+          <!-- Stats rapides -->
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px;" id="postesStats"></div>
+
+          <!-- Formulaire ajout/édition poste -->
+          <div id="posteFormPanel" style="display:none; background:var(--color-background-secondary); border-radius:var(--border-radius-lg); padding:1.25rem; margin-bottom:20px; border:1.5px solid var(--primary);">
+            <h4 id="posteFormTitle" style="color:var(--primary); margin:0 0 16px;">➕ Nouveau poste</h4>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div class="form-group">
+                <label>ID Poste *</label>
+                <input type="text" id="pf_id" placeholder="Ex: ONH-2026-31">
+              </div>
+              <div class="form-group">
+                <label>Titre du poste *</label>
+                <input type="text" id="pf_titre" placeholder="Ex: Ingénieur Géologue">
+              </div>
+              <div class="form-group">
+                <label>Catégorie *</label>
+                <select id="pf_categorie">
+                  <option value="cadre">Cadre (BAC+5)</option>
+                  <option value="maitrise">Maîtrise (BAC+2)</option>
+                  <option value="classe">Classé (BAC)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Niveau requis *</label>
+                <input type="text" id="pf_niveau" placeholder="Ex: BAC+5">
+              </div>
+              <div class="form-group">
+                <label>Spécialité *</label>
+                <input type="text" id="pf_specialite" placeholder="Ex: Géologie pétrolière">
+              </div>
+              <div class="form-group">
+                <label>Département *</label>
+                <input type="text" id="pf_departement" placeholder="Ex: Exploration">
+              </div>
+              <div class="form-group">
+                <label>Lieu d'affectation</label>
+                <input type="text" id="pf_lieu" placeholder="Ex: Rabat">
+              </div>
+              <div class="form-group">
+                <label>Nombre de postes *</label>
+                <input type="number" id="pf_nb_postes" placeholder="Ex: 2" min="1">
+              </div>
+              <div class="form-group">
+                <label>Date de publication</label>
+                <input type="date" id="pf_date_publication">
+              </div>
+              <div class="form-group">
+                <label>Date limite candidature *</label>
+                <input type="date" id="pf_date_limite">
+              </div>
+              <div class="form-group">
+                <label>Expérience (années)</label>
+                <input type="number" id="pf_experience" placeholder="0" min="0">
+              </div>
+              <div class="form-group">
+                <label>Statut</label>
+                <select id="pf_statut">
+                  <option value="Ouvert">Ouvert</option>
+                  <option value="Cloture">Clôturé</option>
+                  <option value="Brouillon">Brouillon</option>
+                  <option value="Annulé">Annulé</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label>Description du poste</label>
+              <textarea id="pf_description" rows="3" style="width:100%; padding:8px; border:1px solid var(--gray-300); border-radius:6px; font-family:inherit; resize:vertical;" placeholder="Missions et responsabilités..."></textarea>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:14px;">
+              <button class="btn btn-secondary" onclick="savePoste()">💾 Enregistrer</button>
+              <button class="btn btn-ghost" onclick="hidePosteForm()">Annuler</button>
+            </div>
+          </div>
+
+          <!-- Tableau des postes -->
+          <div class="table-wrapper">
+            <div class="table-scroll">
+              <table id="postesTable" style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead>
+                  <tr>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:left;">ID</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:left;">Titre</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Catégorie</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Niveau</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:left;">Lieu</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Postes</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Date limite</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Statut</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="postesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div><!-- fin adminPanel-postes -->
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <h4>ONHYM</h4>
+        <p style="font-size:0.93em; opacity:0.9;">Office National des Hydrocarbures et des Mines - Institution stratégique au service du développement énergétique et minier du Royaume du Maroc.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a onclick="showPage('accueil')">Accueil</a></li>
+          <li><a onclick="showPage('offres')">Avis de concours</a></li>
+          <li><a onclick="showPage('candidature')">Postuler</a></li>
+          <li><a onclick="showPage('suivi')">Suivi de candidature</a></li>
+          <li><a onclick="showPage('resultats')">Résultats</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Liens officiels</h4>
+        <ul>
+          <li><a href="https://www.onhym.com" target="_blank">www.onhym.com</a></li>
+          <li><a href="https://www.emploi-public.ma" target="_blank">www.emploi-public.ma</a></li>
+          <li><a onclick="showPage('reclamation')">Réclamations</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <ul>
+          <li>📍 10 rue Abdallah El Mandili, Rabat</li>
+          <li>📞 +212 5 37 69 87 00</li>
+          <li>✉️ recrutement@onhym.com</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      © 2026 ONHYM - Tous droits réservés | Traitement des données conforme à la loi n°09-08
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================
+     JAVASCRIPT - LOGIQUE APPLICATION
+     ============================================================ -->
+<script>
+/* -----------------------------------------------------------
+   TRADUCTIONS FR / AR
+   ----------------------------------------------------------- */
+const I18N = {
+  fr: {
+    brand_title: "ONHYM - Recrutement",
+    brand_subtitle: "Office National des Hydrocarbures et des Mines",
+    menu_toggle: "☰ Menu",
+    nav_home: "🏠 Accueil",
+    nav_offers: "📋 Avis de concours",
+    nav_apply: "✍️ Postuler",
+    nav_track: "🔍 Suivre ma candidature",
+    nav_results: "🏆 Résultats",
+    nav_claim: "⚠️ Réclamation",
+    nav_admin: "🔒 Espace Admin",
+    hero_title: "Plateforme de Recrutement ONHYM",
+    hero_subtitle: "Bienvenue sur la plateforme officielle de recrutement de l'Office National des Hydrocarbures et des Mines. Rejoignez une institution stratégique du Royaume du Maroc au cœur du secteur énergétique et minier.",
+    hero_cta_offers: "📋 Consulter les postes",
+    hero_cta_apply: "✍️ Postuler maintenant",
+    stat_total: "Postes à pourvoir",
+    stat_cadres: "Ingénieurs & Cadres",
+    stat_maitrises: "Techniciens (BAC+2)",
+    stat_classes: "Postes Classés (BAC)",
+    process_title: "Notre processus de recrutement",
+    process_subtitle: "Un processus transparent, objectif et équitable en 5 phases",
+    phase1_title: "Cadrage & Publication",
+    phase1_desc: "Publication des avis de concours pour 15 jours minimum",
+    phase2_title: "Réception & Présélection",
+    phase2_desc: "Analyse des dossiers selon les critères définis",
+    phase3_title: "Épreuve écrite",
+    phase3_desc: "Pour la catégorie 2 (5 cadres, 9 maîtrises, 10 classés)",
+    phase4_title: "Test Oral 1",
+    phase4_desc: "Tests psychotechniques + premier entretien",
+    phase5_title: "Test Oral 2",
+    phase5_desc: "Entretien final avec la commission ONHYM",
+    why_title: "Pourquoi rejoindre l'ONHYM ?",
+    why1_title: "Secteur stratégique",
+    why1_desc: "Au cœur de l'énergie et des mines du Maroc",
+    why2_title: "Projets d'envergure",
+    why2_desc: "Gazoduc Afrique-Atlantique, hydrogène vert, exploration",
+    why3_title: "Développement de carrière",
+    why3_desc: "Formation continue et évolution professionnelle",
+    why4_title: "Équipe experte",
+    why4_desc: "Plus de 900 collaborateurs hautement qualifiés",
+    offers_title: "Avis de concours",
+    offers_subtitle: "Consultez les 30 postes ouverts au recrutement",
+    filter_all: "Tous (30)",
+    filter_cadre: "🎓 Ingénieurs & Cadres (11)",
+    filter_maitrise: "📘 Maîtrises BAC+2 (9)",
+    filter_classe: "📗 Classés BAC (10)"
+  },
+  ar: {
+    brand_title: "المكتب الوطني للهيدروكربونات والمعادن - التوظيف",
+    brand_subtitle: "المكتب الوطني للهيدروكربونات والمعادن",
+    menu_toggle: "☰ القائمة",
+    nav_home: "🏠 الرئيسية",
+    nav_offers: "📋 إعلانات المباريات",
+    nav_apply: "✍️ تقديم الترشيح",
+    nav_track: "🔍 تتبع ملفي",
+    nav_results: "🏆 النتائج",
+    nav_claim: "⚠️ شكاية",
+    nav_admin: "🔒 فضاء الإدارة",
+    hero_title: "منصة التوظيف للمكتب الوطني للهيدروكربونات والمعادن",
+    hero_subtitle: "مرحبا بكم في المنصة الرسمية للتوظيف التابعة للمكتب الوطني للهيدروكربونات والمعادن. انضموا إلى مؤسسة استراتيجية بالمملكة المغربية في قلب قطاع الطاقة والمعادن.",
+    hero_cta_offers: "📋 الاطلاع على المناصب",
+    hero_cta_apply: "✍️ قدموا ترشيحكم الآن",
+    stat_total: "منصب للشغل",
+    stat_cadres: "مهندسون وأطر",
+    stat_maitrises: "تقنيون (باك+2)",
+    stat_classes: "مناصب مرتبة (باك)",
+    process_title: "مسار التوظيف لدينا",
+    process_subtitle: "مسار شفاف وموضوعي ومنصف في 5 مراحل",
+    phase1_title: "التأطير والإعلان",
+    phase1_desc: "نشر إعلانات المباريات لمدة 15 يوما على الأقل",
+    phase2_title: "الاستقبال والانتقاء الأولي",
+    phase2_desc: "دراسة الملفات وفق المعايير المحددة",
+    phase3_title: "الاختبار الكتابي",
+    phase3_desc: "للفئة 2 (5 أطر، 9 تقنيين، 10 منفذين)",
+    phase4_title: "الاختبار الشفوي 1",
+    phase4_desc: "اختبارات نفسية تقنية + مقابلة أولى",
+    phase5_title: "الاختبار الشفوي 2",
+    phase5_desc: "مقابلة نهائية مع لجنة المكتب الوطني",
+    why_title: "لماذا الانضمام إلى المكتب الوطني ؟",
+    why1_title: "قطاع استراتيجي",
+    why1_desc: "في قلب قطاع الطاقة والمعادن بالمغرب",
+    why2_title: "مشاريع كبرى",
+    why2_desc: "أنبوب الغاز إفريقيا-الأطلسي، الهيدروجين الأخضر، التنقيب",
+    why3_title: "تطوير المسار المهني",
+    why3_desc: "التكوين المستمر والتطور المهني",
+    why4_title: "فريق خبير",
+    why4_desc: "أكثر من 900 موظف مؤهل تأهيلا عاليا",
+    offers_title: "إعلانات المباريات",
+    offers_subtitle: "اطلعوا على 30 منصبا مفتوحا للتوظيف",
+    filter_all: "الكل (30)",
+    filter_cadre: "🎓 مهندسون وأطر (11)",
+    filter_maitrise: "📘 تقنيون باك+2 (9)",
+    filter_classe: "📗 منفذون باك (10)"
+  }
+};
+
+function switchLang(lang) {
+  if (!I18N[lang]) return;
+  const dict = I18N[lang];
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+
+  // Mise à jour des boutons de langue
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('lang-' + lang);
+  if (btn) btn.classList.add('active');
+
+  // Mise à jour de tous les textes balisés data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (dict[key]) el.textContent = dict[key];
+  });
+
+  localStorage.setItem('onhym_lang', lang);
+}
+
+/* -----------------------------------------------------------
+   NAVIGATION ENTRE PAGES
+   ----------------------------------------------------------- */
+function isLoggedIn() {
+  try { return !!sessionStorage.getItem('onhym_admin_session'); }
+  catch(e) { return false; }
+}
+
+function showPage(pageId) {
+  // Bloquer l'accès aux pages si non connecté (sauf admin)
+  var logged = false;
+  try { logged = !!sessionStorage.getItem('onhym_admin_session'); } catch(ex) {}
+  if (!logged && pageId !== 'admin') {
+    return;
+  }
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + pageId).classList.add('active');
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  event && event.target && event.target.classList && event.target.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('mainNav').classList.remove('open');
+
+  // Charger contenu dynamique selon la page
+  if (pageId === 'offres' && !window._offresLoaded) loadOffres();
+  if (pageId === 'candidature') loadFormCandidature();
+  if (pageId === 'reclamation') loadFormReclamation();
+  if (pageId === 'resultats' && !window._resultatsLoaded) loadResultats();
+}
+
+function toggleMenu() {
+  document.getElementById('mainNav').classList.toggle('open');
+}
+
+/* -----------------------------------------------------------
+   TABS (onglets résultats)
+   ----------------------------------------------------------- */
+function showTab(tabId, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tabId).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* -----------------------------------------------------------
+   PARSER CSV SIMPLE (Google Sheets publié en CSV)
+   ----------------------------------------------------------- */
+function parseCSV(text) {
+  // Nettoyage BOM UTF-8
+  text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  function parseLine(line) {
+    const result = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  const lines = text.split('\n').filter(l => l.trim());
+  if (lines.length < 2) { console.warn('parseCSV: moins de 2 lignes'); return null; }
+
+  const headers = parseLine(lines[0]).map(h =>
+    h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+     .replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')
+  );
+  console.log('parseCSV OK — colonnes:', headers.length, headers.join(', '));
+
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parseLine(lines[i]);
+    if (cells.every(c => !c)) continue;
+    const obj = {};
+    headers.forEach((h, j) => { obj[h] = cells[j] || ''; });
+    result.push(obj);
+  }
+  console.log('parseCSV — postes lus:', result.length);
+  return result.length ? result : null;
+}
+
+async function fetchCSV(url) {
+  // Essai 1 : URL CSV directe
+  var result = await tryFetch(url);
+  if (result && result.length > 0) return result;
+
+  // Essai 2 : URL HTML alternative si configurée
+  if (CONFIG.SHEET_OFFRES_HTML) {
+    console.log('Essai URL HTML alternative...');
+    result = await tryFetch(CONFIG.SHEET_OFFRES_HTML);
+    if (result && result.length > 0) return result;
+  }
+
+  return null;
+}
+
+async function tryFetch(url) {
+  try {
+    var urlWithCache = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+    var res = await fetch(urlWithCache, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    var trimmed = text.trim();
+    console.log('Réponse reçue, taille:', text.length, 'chars, début:', trimmed.substring(0,50));
+    if (trimmed.startsWith('<!') || trimmed.startsWith('<html') || url.includes('pubhtml')) {
+      console.log('Format : HTML pubhtml');
+      return parseSheetHTML(text);
+    }
+    if (trimmed.includes(',') && !trimmed.startsWith('<')) {
+      console.log('Format : CSV');
+      return parseCSV(text);
+    }
+    return parseCSV(text);
+  } catch(e) {
+    console.warn('tryFetch échoué pour', url, ':', e.message);
+    return null;
+  }
+}
+
+// Parser universel pour le format "Page Web" (pubhtml) de Google Sheets
+function parseSheetHTML(html) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // Google Sheets pubhtml structure : tbody > tr > td avec class "s0", "s1"...
+    // Chercher tous les tableaux et prendre le plus grand
+    const tables = doc.querySelectorAll('table');
+    if (!tables.length) { console.warn('parseSheetHTML: aucun tableau trouvé'); return null; }
+    
+    let mainTable = tables[0];
+    tables.forEach(t => { if (t.rows.length > mainTable.rows.length) mainTable = t; });
+    
+    // Chercher aussi dans les tbody
+    const allRows = mainTable.querySelectorAll('tr');
+    if (allRows.length < 2) { console.warn('parseSheetHTML: moins de 2 lignes'); return null; }
+    
+    // Chercher la ligne d'en-tête : celle qui contient "id" ou "titre"
+    let headerRowIdx = 0;
+    for (let i = 0; i < Math.min(5, allRows.length); i++) {
+      const cells = Array.from(allRows[i].querySelectorAll('td,th')).map(td => td.textContent.trim().toLowerCase());
+      if (cells.includes('id') || cells.includes('titre') || cells.includes('title')) {
+        headerRowIdx = i;
+        break;
+      }
+    }
+    
+    const headers = Array.from(allRows[headerRowIdx].querySelectorAll('td,th')).map(td =>
+      td.textContent.trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '') // retirer accents
+        .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+    );
+    
+    console.log('parseSheetHTML — en-têtes détectés :', headers);
+    
+    const result = [];
+    for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+      const cells = Array.from(allRows[i].querySelectorAll('td,th')).map(td => td.textContent.trim());
+      if (cells.every(c => !c) || cells.length === 0) continue;
+      if (cells[0] === '' && cells.length < 3) continue; // ligne vide
+      const obj = {};
+      headers.forEach((h, j) => { obj[h] = cells[j] || ''; });
+      // Mapper les noms de colonnes alternatifs
+      if (!obj.id && obj.id_) obj.id = obj.id_;
+      if (!obj.titre && obj.title) obj.titre = obj.title;
+      if (!obj.categorie && obj.category) obj.categorie = obj.category;
+      // Normaliser la categorie
+      if (obj.categorie) obj.categorie = obj.categorie.toLowerCase()
+        .replace(/ingenieur|cadre|^cadres?$/i, 'cadre')
+        .replace(/maitrise|technicien|bac\+2/i, 'maitrise')
+        .replace(/classe|agent|bac$/i, 'classe');
+
+      // Colonnes optionnelles — valeurs par défaut si absentes du Sheets
+      if (!obj.visible)           obj.visible = 'TRUE';
+      if (!obj.lieu)              obj.lieu = '';
+      if (!obj.experience)        obj.experience = '';
+      if (!obj.age_max)           obj.age_max = '';
+      if (!obj.date_publiee)      obj.date_publiee = obj.date_publication || '';
+      if (!obj.nb_candidatures)   obj.nb_candidatures = '0';
+      if (!obj.taux_remplissage)  obj.taux_remplissage = '0';
+
+      // Filtrer : n'afficher que les postes visibles et au statut Ouvert
+      const statutOk = !obj.statut || ['ouvert','open',''].includes(obj.statut.toLowerCase());
+      const visibleOk = !obj.visible || obj.visible.toString().toUpperCase() !== 'FALSE';
+      if (statutOk && visibleOk) result.push(obj);
+    }
+    console.log('Google Sheets pubhtml parse :', result.length, 'lignes | colonnes :', headers.join(', '));
+    return result.length ? result : null;
+  } catch (e) {
+    console.warn('Erreur parsing pubhtml:', e);
+    return null;
+  }
+}
+
+/* -----------------------------------------------------------
+   ETAPE 1 : APPLICATION INITIALE
+   Les fonctions suivantes seront complétées aux étapes 2-6
+   ----------------------------------------------------------- */
+
+/* -----------------------------------------------------------
+   ETAPE 2 : CHARGEMENT DES OFFRES DEPUIS GOOGLE SHEETS
+   Format Google Sheets attendu (colonnes) :
+   id | titre | categorie | niveau | specialite | departement |
+   date_publication | date_limite | nb_postes | description | statut
+   ----------------------------------------------------------- */
+
+// Données de démonstration (utilisées si Google Sheets non configuré)
+// OFFRES_DEMO : 30 postes de secours si Google Sheets non disponible
+// Source principale : CONFIG.SHEET_OFFRES_CSV (Google Sheets ONHYM_Offres)
+// Répartition : 11 Cadres | 9 Maîtrises | 10 Classés
+const OFFRES_DEMO = [
+  {
+    "id": "ONH-2026-01",
+    "titre": "Ingénieur Géologue Senior",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Géologie pétrolière",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Analyse de bassins sédimentaires, interprétation des données de terrain, prospection pétrolière et minière.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-02",
+    "titre": "Ingénieur Géophysicien",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Géophysique",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Interprétation sismique 2D/3D, traitement de données géophysiques, modélisation subsurface.",
+    "experience": "2",
+    "age_max": "38",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-03",
+    "titre": "Ingénieur Réservoir",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Ingénierie pétrolière",
+    "departement": "Production",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Modélisation et simulation de gisements, gestion optimisée de la production pétrolière et gazière.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-04",
+    "titre": "Ingénieur Forage",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Forage & Complétion de puits",
+    "departement": "Opérations",
+    "lieu": "Agadir",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Supervision des opérations de forage, conception des programmes de forage, contrôle technique sur site.",
+    "experience": "4",
+    "age_max": "42",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-05",
+    "titre": "Ingénieur Mines",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Ingénierie minière",
+    "departement": "Mines",
+    "lieu": "Ouarzazate",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Exploitation et valorisation de gisements miniers, études de faisabilité, suivi des travaux miniers.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-06",
+    "titre": "Ingénieur Géochimiste",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Géochimie organique",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Analyses géochimiques des roches mères et des fluides, évaluation du potentiel pétrolier des bassins.",
+    "experience": "2",
+    "age_max": "38",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-07",
+    "titre": "Ingénieur HSE",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Hygiène-Sécurité-Environnement",
+    "departement": "QHSE",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Management du système HSE sur sites opérationnels, audits, plans d'urgence et formations sécurité.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-08",
+    "titre": "Cadre Financier",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Finance / Contrôle de gestion",
+    "departement": "DAF",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Pilotage budgétaire, reporting financier, analyse de performance et optimisation des coûts opérationnels.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-09",
+    "titre": "Cadre Juridique",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Droit des affaires / Droit minier",
+    "departement": "Juridique",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Rédaction et négociation de contrats pétroliers et miniers, veille juridique, contentieux.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-10",
+    "titre": "Ingénieur Systèmes d'Information",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Informatique / SI",
+    "departement": "DSI",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Administration des systèmes d'information, projets de transformation numérique, cybersécurité.",
+    "experience": "2",
+    "age_max": "38",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-11",
+    "titre": "Cadre RH & Développement",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Ressources humaines",
+    "departement": "DRH",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Gestion du développement RH, plans de formation, évaluation des compétences et GPEC.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-12",
+    "titre": "Technicien Géologue",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Géologie",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Échantillonnage de carottes, cartographie géologique, gestion des bases de données terrain.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-13",
+    "titre": "Technicien Géophysique",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Géophysique appliquée",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Acquisition et traitement de données sismiques, maintenance des équipements de terrain.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-14",
+    "titre": "Technicien Laboratoire Géochimie",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Chimie analytique",
+    "departement": "Laboratoire",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Analyses géochimiques de roches et de fluides, gestion des équipements analytiques.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-15",
+    "titre": "Technicien Électromécanique",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Électromécanique / Maintenance",
+    "departement": "Maintenance",
+    "lieu": "Agadir",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Maintenance préventive et corrective des équipements de forage et de surface.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16",
+    "titre": "Technicien Topographe",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Topographie / SIG",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Levés topographiques, gestion des SIG, cartographie numérique.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16B",
+    "titre": "Technicien Informatique",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Informatique / Réseaux",
+    "departement": "DSI",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Support technique, administration des postes de travail et réseaux informatiques.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16C",
+    "titre": "Technicien Dessinateur",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Dessin industriel / DAO",
+    "departement": "Opérations",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Réalisation de plans et schémas techniques, gestion de la bibliothèque de dessins.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16D",
+    "titre": "Technicien HSE Terrain",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Hygiène-Sécurité-Environnement",
+    "departement": "QHSE",
+    "lieu": "Agadir",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Application des procédures HSE sur site, contrôle des EPI, rapports de sécurité.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16E",
+    "titre": "Technicien Comptable",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Comptabilité / Gestion",
+    "departement": "DAF",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Saisie comptable, rapprochements bancaires, gestion des factures fournisseurs.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-17",
+    "titre": "Agent Administratif",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Administration générale",
+    "departement": "Services généraux",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Gestion administrative, secrétariat, accueil, classement et archivage de documents.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-18",
+    "titre": "Agent de Saisie & Archivage",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Bureautique / Informatique",
+    "departement": "Documentation",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Saisie de données, numérisation et archivage électronique des documents.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-19",
+    "titre": "Agent Logistique",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Logistique / Gestion des stocks",
+    "departement": "Achats",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Réception, stockage et distribution du matériel, gestion des inventaires.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-20",
+    "titre": "Agent de Sécurité",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Sécurité industrielle",
+    "departement": "Sécurité",
+    "lieu": "Agadir",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Surveillance et contrôle des accès aux sites ONHYM, rondes de sécurité.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-21",
+    "titre": "Chauffeur Véhicule Léger",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Transport / Logistique",
+    "departement": "Services généraux",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Transport du personnel et du matériel, entretien courant des véhicules.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-22",
+    "titre": "Agent d'Entretien Technique",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Électricité / Plomberie",
+    "departement": "Maintenance",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Entretien courant des locaux et installations techniques.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-23",
+    "titre": "Opérateur de Saisie",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Bureautique",
+    "departement": "Documentation",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Saisie et mise à jour des bases de données documentaires.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-24",
+    "titre": "Agent d'Accueil & Protocole",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Accueil / Communication",
+    "departement": "Services généraux",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Accueil des visiteurs, gestion du standard téléphonique.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-25",
+    "titre": "Magasinier",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Gestion des stocks",
+    "departement": "Achats",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Réception et rangement des marchandises, gestion physique des stocks.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-26",
+    "titre": "Planton / Coursier Interne",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Services généraux",
+    "departement": "Services généraux",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Distribution du courrier interne, liaisons inter-services.",
+    "experience": "",
+    "age_max": "28",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "TOTAL",
+    "titre": "",
+    "categorie": "",
+    "niveau": "",
+    "specialite": "",
+    "departement": "",
+    "lieu": "",
+    "date_publication": "",
+    "date_limite": "",
+    "nb_postes": "=SUM(J4:J33)",
+    "description": "",
+    "experience": "",
+    "age_max": "",
+    "date_publiee": "",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  }
+];
+
+let _allOffres = [];
+
+async function loadOffres() {
+  const container = document.getElementById('offersContainer');
+  container.innerHTML = '<div class="loader"><div class="spinner"></div><p>Chargement des avis de concours...</p></div>';
+
+  let data = null;
+  let source = 'demo';
+
+  // Tentative 1 : CSV depuis Google Sheets (fonctionne uniquement si hébergé sur serveur)
+  // En mode fichier local (file://), le fetch est bloqué par CORS → fallback OFFRES_DEMO
+  if (CONFIG.SHEET_OFFRES_CSV && !CONFIG.SHEET_OFFRES_CSV.includes('REMPLACER_ID')) {
+    try {
+      data = await fetchCSV(CONFIG.SHEET_OFFRES_CSV);
+      if (data && data.length > 0) {
+        data = data.map(o => {
+          if (o.categorie) o.categorie = o.categorie.trim().toLowerCase()
+            .replace(/cadre|ingenieur|ing\./, 'cadre')
+            .replace(/maitrise|technicien|tech\./, 'maitrise')
+            .replace(/class|agent/, 'classe');
+          if (!o.visible || o.visible === '') o.visible = 'TRUE';
+          if (!o.statut  || o.statut  === '') o.statut  = 'Ouvert';
+          return o;
+        }).filter(o =>
+          o.visible.toUpperCase() !== 'FALSE' &&
+          ['ouvert','open',''].includes(o.statut.toLowerCase())
+        );
+        source = data.length > 0 ? 'sheets' : 'demo';
+      }
+    } catch(e) {
+      console.warn('Fetch Google Sheets échoué (CORS en local ?):', e.message);
+    }
+  }
+
+  // Fallback : données depuis localStorage (modifiables via admin) ou OFFRES_DEMO
+  if (!data || data.length === 0) {
+    try {
+      const stored = localStorage.getItem(POSTES_KEY);
+      data = stored ? JSON.parse(stored) : OFFRES_DEMO;
+    } catch(e) { data = OFFRES_DEMO; }
+    source = 'integre';
+  }
+
+  _allOffres = data;
+
+  if (source === 'demo') {
+    container.innerHTML = `<div class="alert alert-warning">
+      <span class="alert-icon">⚠️</span>
+      <div>
+        <strong>Mode démonstration :</strong> Données types affichées. 
+        Google Sheets non accessible ou données non reconnues.<br>
+        <small style="color:var(--gray-600);">
+          Vérifiez la console du navigateur (F12 → Console) pour le détail.
+          <br>Lien configuré : <code style="font-size:10px;">${CONFIG.SHEET_OFFRES_CSV.substring(0,60)}...</code>
+        </small>
+        <br><button class="btn btn-ghost" style="margin-top:8px;padding:4px 12px;font-size:0.82em;" 
+          onclick="reloadOffres()">🔄 Réessayer la connexion Google Sheets</button>
+      </div>
+    </div><div id="offersInner"></div>`;
+  } else {
+    container.innerHTML = `<div class="alert alert-success" style="margin-bottom:12px;">
+      <span class="alert-icon">✅</span>
+      <div><strong>Données chargées depuis Google Sheets ONHYM_Offres</strong>
+        <br><small style="color:var(--gray-600);">Mis à jour le ${new Date().toLocaleString('fr-FR')}</small>
+      </div>
+    </div><div id="offersInner"></div>`;
+  }
+
+  renderOffres(_allOffres, 'offersInner');
+  updateFilterCounts();
+  window._offresLoaded = true;
+  // Afficher l'heure de dernière mise à jour
+  const elUpdate = document.getElementById('offresLastUpdate');
+  if (elUpdate) elUpdate.textContent = 'Dernière mise à jour : ' + new Date().toLocaleTimeString('fr-FR');
+}
+
+function renderOffres(offres, containerId) {
+  const container = document.getElementById(containerId || 'offersContainer');
+  if (!offres || offres.length === 0) {
+    container.innerHTML = '<div class="alert alert-info"><span class="alert-icon">ℹ️</span><div>Aucune offre disponible actuellement.</div></div>';
+    return;
+  }
+  const html = '<div class="offers-grid">' + offres.map(o => renderOfferCard(o)).join('') + '</div>';
+  container.innerHTML = html;
+}
+
+function renderOfferCard(o) {
+  const catLabels = { cadre:'🎓 Ingénieur / Cadre', maitrise:'📘 Technicien', classe:'📗 Classé' };
+  const catLabel = catLabels[o.categorie] || o.categorie;
+  const daysLeft = daysUntil(o.date_limite);
+  const deadlineBadge = daysLeft >= 0
+    ? `<span class="deadline-badge">⏰ ${daysLeft} j restant${daysLeft>1?'s':''}</span>`
+    : '<span class="deadline-badge" style="color:var(--gray-600)">❌ Clôturé</span>';
+
+  return `
+    <div class="offer-card" data-categorie="${escapeHtml(o.categorie)}">
+      <div class="offer-header">
+        <div class="offer-category">${catLabel}</div>
+        <div class="offer-title">${escapeHtml(o.titre)}</div>
+      </div>
+      <div class="offer-body">
+        <div class="offer-info"><strong>📋 Code</strong><span>${escapeHtml(o.id)}</span></div>
+        <div class="offer-info"><strong>🎓 Niveau</strong><span>${escapeHtml(o.niveau)}</span></div>
+        <div class="offer-info"><strong>🔬 Spécialité</strong><span>${escapeHtml(o.specialite)}</span></div>
+        <div class="offer-info"><strong>🏢 Département</strong><span>${escapeHtml(o.departement)}</span></div>
+        ${o.lieu ? `<div class="offer-info"><strong>📍 Lieu</strong><span>${escapeHtml(o.lieu)}</span></div>` : ''}
+        <div class="offer-info"><strong>👥 Postes</strong><span>${escapeHtml(o.nb_postes)}</span></div>
+        ${o.experience ? `<div class="offer-info"><strong>⏱ Expérience</strong><span>${escapeHtml(o.experience)} an(s) min.</span></div>` : ''}
+        <div class="offer-info"><strong>📅 Date limite</strong><span>${formatDate(o.date_limite)}</span></div>
+        ${o.description ? `<p style="margin-top:12px; font-size:0.9em; color:var(--gray-600); line-height:1.5;">${escapeHtml(o.description)}</p>` : ''}
+      </div>
+      <div class="offer-footer">
+        ${deadlineBadge}
+        <button class="btn btn-primary" style="padding:8px 18px; font-size:0.9em;" onclick="postuler('${escapeHtml(o.id)}')">Postuler</button>
+      </div>
+    </div>
+  `;
+}
+
+function postuler(offreId) {
+  sessionStorage.setItem('offre_selected', offreId);
+  showPage('candidature');
+  setTimeout(() => {
+    alert('✉️ Vous postulez pour l\'offre : ' + offreId + '\n\nMerci de mentionner ce code dans le formulaire ci-dessous.');
+  }, 300);
+}
+
+function filterOffers(cat, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = cat === 'all' ? _allOffres : _allOffres.filter(o => o.categorie === cat);
+  const target = document.getElementById('offersInner') ? 'offersInner' : 'offersContainer';
+  renderOffres(filtered, target);
+}
+
+function reloadOffres() {
+  // Forcer le rechargement depuis Google Sheets (vide le cache local)
+  window._offresLoaded = false;
+  _allOffres = [];
+  document.getElementById('offersContainer').innerHTML = '<div class="loader"><div class="spinner"></div><p>Actualisation depuis Google Sheets...</p></div>';
+  loadOffres().then(() => {
+    const el = document.getElementById('offresLastUpdate');
+    if (el) el.textContent = 'Dernière mise à jour : ' + new Date().toLocaleTimeString('fr-FR');
+  });
+}
+
+function updateFilterCounts() {
+  if (!_allOffres.length) return;
+  const total = _allOffres.length;
+  const cadre = _allOffres.filter(o => o.categorie === 'cadre').length;
+  const maitrise = _allOffres.filter(o => o.categorie === 'maitrise').length;
+  const classe = _allOffres.filter(o => o.categorie === 'classe').length;
+  const fa = document.getElementById('filter-all');
+  const fc = document.getElementById('filter-cadre');
+  const fm = document.getElementById('filter-maitrise');
+  const fl = document.getElementById('filter-classe');
+  if (fa) fa.textContent = `Tous (${total})`;
+  if (fc) fc.textContent = `🎓 Ingénieurs & Cadres (${cadre})`;
+  if (fm) fm.textContent = `📘 Maîtrises BAC+2 (${maitrise})`;
+  if (fl) fl.textContent = `📗 Classés BAC (${classe})`;
+}
+
+/* Utilitaires */
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function formatDate(d) {
+  if (!d) return '-';
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt)) return d;
+    return dt.toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' });
+  } catch (e) { return d; }
+}
+function daysUntil(d) {
+  if (!d) return -1;
+  const dt = new Date(d);
+  if (isNaN(dt)) return -1;
+  const diff = dt - new Date();
+  return Math.ceil(diff / (1000*60*60*24));
+}
+
+/* -----------------------------------------------------------
+   ETAPE 3 : FORMULAIRE DE CANDIDATURE (Google Forms)
+   - Intégration iframe
+   - Génération automatique d'un code candidat unique (pré-rempli dans le form si URL de pré-remplissage fournie)
+   - Affichage du code à l'utilisateur pour suivi ultérieur
+   ----------------------------------------------------------- */
+
+function generateCandidatureCode() {
+  // Format : ONHYM-2026-XXXX (4 chiffres aléatoires horodatés)
+  const now = Date.now().toString(36).toUpperCase().slice(-5);
+  const rnd = Math.floor(Math.random() * 90 + 10);
+  return `ONHYM-2026-${now}${rnd}`;
+}
+
+function loadFormCandidature() {
+  const iframe = document.getElementById('formCandidature');
+  const fallback = document.getElementById('formFallback');
+
+  // Générer ou récupérer un code candidat
+  let code = sessionStorage.getItem('candidat_code');
+  if (!code) {
+    code = generateCandidatureCode();
+    sessionStorage.setItem('candidat_code', code);
+  }
+  const offre = sessionStorage.getItem('offre_selected') || '';
+
+  // Afficher la bannière code candidat au-dessus du formulaire
+  injectCandidatureBanner(code, offre);
+
+  if (CONFIG.FORM_CANDIDATURE && !CONFIG.FORM_CANDIDATURE.includes('REMPLACER_ID')) {
+    let url = CONFIG.FORM_CANDIDATURE;
+    // Pré-remplissage des champs si IDs configurés (entry.XXXXXXX)
+    if (CONFIG.FORM_PREFILL_CODE_ENTRY) {
+      url += '&' + CONFIG.FORM_PREFILL_CODE_ENTRY + '=' + encodeURIComponent(code);
+    }
+    if (CONFIG.FORM_PREFILL_OFFRE_ENTRY && offre) {
+      url += '&' + CONFIG.FORM_PREFILL_OFFRE_ENTRY + '=' + encodeURIComponent(offre);
+    }
+    // Détection d'erreur iframe : si Google renvoie une page d'erreur, basculer vers bouton
+    iframe.onload = function() {
+      try {
+        // Tenter d'accéder au titre de la page chargée (échoue si cross-origin, OK si erreur Google Drive)
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        const bodyText = iframeDoc.body ? iframeDoc.body.innerText : '';
+        if (bodyText.includes("n'existe pas") || bodyText.includes("not exist") || bodyText.includes("Drive")) {
+          showFormFallback(url, code);
+        }
+      } catch(e) {
+        // Cross-origin = formulaire Google chargé normalement, pas d'erreur
+      }
+    };
+    iframe.src = url;
+    iframe.style.display = 'block';
+    fallback.style.display = 'none';
+  } else {
+    iframe.style.display = 'none';
+    fallback.style.display = 'flex';
+  }
+}
+
+// Résout un lien court Google Forms (forms.gle) ou retourne l'URL telle quelle
+async function resolveFormURL(url) {
+  // Déjà une URL Google Forms complète — retourner directement
+  if (url.includes('docs.google.com/forms')) return url;
+  // Lien court forms.gle — construire l'URL embed via le pattern connu
+  // forms.gle/XXXX redirige vers docs.google.com/forms/d/e/ID/viewform
+  // On charge le lien dans un fetch no-redirect pour récupérer le Location header
+  try {
+    const res = await fetch(url, { method: 'HEAD', redirect: 'manual' });
+    const location = res.headers.get('location') || res.url;
+    if (location && location.includes('google.com/forms')) return location;
+  } catch(e) { /* CORS probable en HEAD */ }
+  // Fallback : embed direct du lien court (marche dans iframe moderne)
+  return url;
+}
+
+function showFormFallback(formUrl, code) {
+  // L'iframe a renvoyé une erreur Google Drive — afficher un bouton lien direct propre
+  const iframe = document.getElementById('formCandidature');
+  const fallback = document.getElementById('formFallback');
+  const viewUrl = formUrl.replace('?embedded=true','').replace('&embedded=true','');
+  iframe.style.display = 'none';
+  fallback.style.display = 'flex';
+  fallback.innerHTML = `
+    <span class="alert-icon">📋</span>
+    <div>
+      <strong>Formulaire "Candidature ONHYM 2026"</strong><br>
+      <small style="color:var(--gray-600);">Votre code candidat : <code style="font-weight:700;">${escapeHtml(code)}</code> — notez-le avant de remplir le formulaire.</small><br><br>
+      <a href="${escapeHtml(viewUrl)}" target="_blank" class="btn btn-primary" style="display:inline-block; margin-top:4px;">
+        ✍️ Ouvrir le formulaire de candidature ↗
+      </a>
+      <p style="margin-top:12px; font-size:0.82em; color:var(--gray-600);">
+        Le formulaire s'ouvre dans un nouvel onglet. Une fois soumis, revenez ici pour suivre votre candidature avec votre code.
+      </p>
+    </div>
+  `;
+}
+
+function injectCandidatureBanner(code, offre) {
+  const wrapper = document.querySelector('#page-candidature .form-wrapper');
+  const existing = document.getElementById('candidatureBanner');
+  if (existing) existing.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'candidatureBanner';
+  banner.className = 'alert alert-success';
+  banner.innerHTML = `
+    <span class="alert-icon">✅</span>
+    <div>
+      <strong>Votre code candidat :</strong>
+      <code style="background:white; padding:4px 10px; border-radius:4px; font-size:1.05em; font-weight:700; color:var(--primary);">${escapeHtml(code)}</code>
+      <button onclick="copyCode('${escapeHtml(code)}')" style="margin-left:8px; background:var(--primary); color:white; padding:4px 12px; border-radius:4px; font-size:0.85em; cursor:pointer; border:none;">📋 Copier</button>
+      ${offre ? `<br><small style="color:var(--gray-800);"><strong>Offre sélectionnée :</strong> ${escapeHtml(offre)}</small>` : ''}
+      <br><small>⚠️ Notez ce code pour suivre votre candidature ultérieurement.</small>
+    </div>
+  `;
+  const instructions = wrapper.querySelector('.form-instructions');
+  instructions.parentNode.insertBefore(banner, instructions.nextSibling);
+}
+
+function copyCode(code) {
+  navigator.clipboard.writeText(code).then(() => {
+    alert('✅ Code copié : ' + code);
+  }).catch(() => {
+    prompt('Copiez ce code :', code);
+  });
+}
+
+function loadFormReclamation() {
+  const iframe = document.getElementById('formReclamation');
+  if (CONFIG.FORM_RECLAMATION && !CONFIG.FORM_RECLAMATION.includes('REMPLACER_ID')) {
+    iframe.src = CONFIG.FORM_RECLAMATION;
+    iframe.style.display = 'block';
+  } else {
+    iframe.style.display = 'none';
+    iframe.insertAdjacentHTML('afterend', `
+      <div class="alert alert-info">
+        <span class="alert-icon">ℹ️</span>
+        <div><strong>Formulaire de réclamation en configuration.</strong> Le Google Form apparaîtra ici une fois configuré.</div>
+      </div>
+    `);
+  }
+}
+
+/* -----------------------------------------------------------
+   ETAPE 4 : SUIVI DE CANDIDATURE
+   Format Google Sheets de suivi (colonnes minimales) :
+   code | nom | prenom | email | poste | categorie | diplome |
+   statut_preselection | statut_ecrit | statut_oral1 | statut_oral2 |
+   note_ecrit | note_oral1 | note_oral2 | statut_final | date_maj
+   ----------------------------------------------------------- */
+
+// Données démo pour tester le suivi sans Google Sheets
+const SUIVI_DEMO = [
+  { code:'ONHYM-2026-00101', nom:'EL ALAMI', prenom:'Youssef', email:'youssef.elalami@example.com', poste:'ONH-2026-01', categorie:'cadre', diplome:'Ingénieur d\'État Géologie - EMI',
+    statut_preselection:'retenu', statut_ecrit:'n/a', statut_oral1:'convoque', statut_oral2:'en_attente',
+    note_ecrit:'', note_oral1:'', note_oral2:'', statut_final:'en_cours', date_maj:'2026-04-22'},
+  { code:'ONHYM-2026-00102', nom:'BENNANI', prenom:'Fatima', email:'fatima.bennani@example.com', poste:'ONH-2026-03', categorie:'cadre', diplome:'Master Ingénierie Pétrolière',
+    statut_preselection:'retenu', statut_ecrit:'admis', statut_oral1:'admis', statut_oral2:'admis',
+    note_ecrit:'16/20', note_oral1:'15/20', note_oral2:'17/20', statut_final:'admis', date_maj:'2026-04-20'},
+  { code:'ONHYM-2026-00103', nom:'KAMAL', prenom:'Mohamed', email:'mohamed.kamal@example.com', poste:'ONH-2026-09', categorie:'maitrise', diplome:'DUT Géologie',
+    statut_preselection:'rejete', statut_ecrit:'n/a', statut_oral1:'n/a', statut_oral2:'n/a',
+    note_ecrit:'', note_oral1:'', note_oral2:'', statut_final:'rejete', date_maj:'2026-04-18'}
+];
+
+async function checkCandidature(e) {
+  e.preventDefault();
+  const code = document.getElementById('codeCandidat').value.trim().toUpperCase();
+  const email = document.getElementById('emailCandidat').value.trim().toLowerCase();
+  const result = document.getElementById('suiviResult');
+  result.style.display = 'block';
+  result.innerHTML = '<div class="loader"><div class="spinner"></div><p>Recherche de votre dossier...</p></div>';
+
+  // Chargement depuis Google Sheets ou fallback demo
+  let data = null;
+  if (CONFIG.SHEET_SUIVI_CSV && !CONFIG.SHEET_SUIVI_CSV.includes('REMPLACER_ID')) {
+    data = await fetchCSV(CONFIG.SHEET_SUIVI_CSV);
+  }
+  if (!data) data = SUIVI_DEMO;
+
+  // Recherche par code + email (sécurité minimale)
+  const candidat = data.find(d =>
+    (d.code || '').toUpperCase() === code &&
+    (d.email || '').toLowerCase() === email
+  );
+
+  if (!candidat) {
+    result.innerHTML = `
+      <div class="alert alert-danger">
+        <span class="alert-icon">❌</span>
+        <div>
+          <strong>Aucun dossier trouvé.</strong><br>
+          Vérifiez votre <strong>code candidat</strong> et votre <strong>email</strong>. Si le problème persiste, contactez
+          <a href="mailto:${CONFIG.EMAIL_CONTACT}">${CONFIG.EMAIL_CONTACT}</a>.
+          <br><small>💡 Code attendu au format : ONHYM-2026-XXXXX</small>
+        </div>
+      </div>`;
+    return;
+  }
+
+  result.innerHTML = renderCandidatureCard(candidat);
+}
+
+function renderCandidatureCard(c) {
+  const phases = [
+    { id:'preselection', title:'Phase 2 — Présélection sur dossier', desc:'Analyse de votre CV, diplômes et pièces', statut: c.statut_preselection, note:'' },
+    { id:'ecrit',        title:'Phase 3 — Épreuve écrite', desc:c.categorie === 'cadre' && !c.statut_ecrit ? 'Non applicable (catégorie 1 — sélection sur dossier)' : 'Test écrit pour catégorie 2', statut: c.statut_ecrit, note: c.note_ecrit },
+    { id:'oral1',        title:'Phase 4 — Test Oral 1', desc:'Test psychotechnique + 1er entretien', statut: c.statut_oral1, note: c.note_oral1 },
+    { id:'oral2',        title:'Phase 5 — Test Oral 2', desc:'Entretien final avec la commission ONHYM', statut: c.statut_oral2, note: c.note_oral2 }
+  ];
+
+  const statusFinal = c.statut_final || 'en_cours';
+  let finalBanner = '';
+  if (statusFinal === 'admis') {
+    finalBanner = `<div class="alert alert-success" style="margin:20px 25px;"><span class="alert-icon">🎉</span><div><strong>Félicitations ${escapeHtml(c.prenom)} !</strong> Vous êtes <strong>ADMIS(E)</strong>. Notre équipe vous contactera pour les formalités.</div></div>`;
+  } else if (statusFinal === 'attente') {
+    finalBanner = `<div class="alert alert-warning" style="margin:20px 25px;"><span class="alert-icon">⏳</span><div>Vous êtes sur la <strong>liste d'attente</strong>.</div></div>`;
+  } else if (statusFinal === 'rejete') {
+    finalBanner = `<div class="alert alert-danger" style="margin:20px 25px;"><span class="alert-icon">❌</span><div>Votre candidature n'a pas été retenue. Nous vous remercions de votre intérêt pour l'ONHYM.</div></div>`;
+  }
+
+  return `
+    <div class="candidate-card">
+      <div class="candidate-header">
+        <h3>${escapeHtml(c.prenom)} ${escapeHtml(c.nom)}</h3>
+        <p>${escapeHtml(c.email)}</p>
+        <div class="code">${escapeHtml(c.code)}</div>
+        <p style="margin-top:10px; font-size:0.95em;">
+          <strong>🎯 Poste :</strong> ${escapeHtml(c.poste)} &nbsp; | &nbsp;
+          <strong>🎓 Diplôme :</strong> ${escapeHtml(c.diplome)}
+        </p>
+      </div>
+      ${finalBanner}
+      <div class="timeline">
+        ${phases.map(p => renderTimelineItem(p)).join('')}
+      </div>
+      <div style="padding: 15px 25px; background: var(--gray-50); text-align:right; font-size:0.85em; color:var(--gray-600);">
+        Dernière mise à jour : ${formatDate(c.date_maj)}
+      </div>
+    </div>
+  `;
+}
+
+function renderTimelineItem(phase) {
+  const statutMap = {
+    'retenu':    { dot:'done',    tag:'done',    label:'✅ Retenu',        icon:'✓' },
+    'admis':     { dot:'done',    tag:'done',    label:'✅ Admis',         icon:'✓' },
+    'convoque':  { dot:'current', tag:'current', label:'📅 Convoqué',      icon:'!' },
+    'en_cours':  { dot:'current', tag:'current', label:'⏳ En cours',      icon:'…' },
+    'en_attente':{ dot:'',        tag:'pending', label:'⏸ En attente',    icon:'…' },
+    'rejete':    { dot:'failed',  tag:'failed',  label:'❌ Non retenu',    icon:'×' },
+    'n/a':       { dot:'',        tag:'pending', label:'➖ Non applicable', icon:'–' },
+    '':          { dot:'',        tag:'pending', label:'⏸ En attente',    icon:'…' }
+  };
+  const s = statutMap[phase.statut] || statutMap[''];
+  return `
+    <div class="timeline-item">
+      <div class="timeline-dot ${s.dot}">${s.icon}</div>
+      <div class="timeline-content">
+        <h4>${escapeHtml(phase.title)}</h4>
+        <p>${escapeHtml(phase.desc)}</p>
+        <span class="status-tag ${s.tag}">${s.label}</span>
+        ${phase.note ? `<span class="status-tag done" style="margin-left:8px;">📊 Note : ${escapeHtml(phase.note)}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+/* -----------------------------------------------------------
+   ETAPE 6 : PUBLICATION DES RESULTATS PAR PHASE
+   Utilise les mêmes données Google Sheets que le suivi
+   ----------------------------------------------------------- */
+
+async function loadResultats() {
+  // Préparer un bouton "publier" au-dessus de chaque tableau
+  let data = null;
+  if (CONFIG.SHEET_SUIVI_CSV && !CONFIG.SHEET_SUIVI_CSV.includes('REMPLACER_ID')) {
+    data = await fetchCSV(CONFIG.SHEET_SUIVI_CSV);
+  }
+  if (!data || !data.length) data = SUIVI_DEMO;
+
+  // Présélection : tous ceux avec statut_preselection défini
+  const preselect = data.filter(d => d.statut_preselection && d.statut_preselection !== '');
+  renderResultsTable('resultsPreselection', preselect, 'statut_preselection', 'Présélection sur dossier');
+
+  // Écrit : tous ceux ayant passé l'écrit (catégorie 2 uniquement)
+  const ecrit = data.filter(d => d.statut_ecrit && d.statut_ecrit !== 'n/a' && d.statut_ecrit !== '');
+  renderResultsTable('resultsEcrit', ecrit, 'statut_ecrit', 'Épreuve écrite', 'note_ecrit');
+
+  // Oral 1
+  const oral1 = data.filter(d => d.statut_oral1 && d.statut_oral1 !== 'n/a' && d.statut_oral1 !== '');
+  renderResultsTable('resultsOral1', oral1, 'statut_oral1', 'Test Oral 1', 'note_oral1');
+
+  // Oral 2 (résultats finaux)
+  const oral2 = data.filter(d => d.statut_final && d.statut_final !== '' && d.statut_final !== 'en_cours');
+  renderResultsTable('resultsOral2', oral2, 'statut_final', 'Oral 2 — Résultats finaux', 'note_oral2', true);
+
+  window._resultatsLoaded = true;
+}
+
+function renderResultsTable(containerId, data, statutField, title, noteField, isFinal) {
+  const container = document.getElementById(containerId);
+  if (!data.length) {
+    container.innerHTML = `
+      <div class="alert alert-info">
+        <span class="alert-icon">ℹ️</span>
+        <div><strong>Résultats non encore publiés.</strong> Les résultats de la phase "${title}" seront affichés ici une fois validés par l'ONHYM.</div>
+      </div>`;
+    return;
+  }
+
+  // Tri par ordre de mérite (note descendante si applicable, sinon admis en premier)
+  let sorted = [...data];
+  if (noteField) {
+    sorted.sort((a, b) => parseFloat((b[noteField]||'0').split('/')[0]) - parseFloat((a[noteField]||'0').split('/')[0]));
+  }
+
+  const retenus = sorted.filter(c => ['retenu','admis'].includes(c[statutField]));
+  const attente = sorted.filter(c => c[statutField] === 'attente');
+  const rejetes = sorted.filter(c => ['rejete','non_retenu'].includes(c[statutField]));
+
+  let html = '';
+
+  // Tableau principal
+  html += `
+    <div class="alert alert-info" style="margin-bottom:20px;">
+      <span class="alert-icon">📊</span>
+      <div><strong>${title}</strong> — ${retenus.length} retenu(s)${attente.length ? ', ' + attente.length + ' sur liste d\'attente' : ''}${rejetes.length ? ', ' + rejetes.length + ' non retenu(s)' : ''} — Total ${sorted.length}</div>
+    </div>
+  `;
+
+  if (retenus.length) {
+    html += '<h3 style="color:var(--success); margin:20px 0 12px;">✅ Candidats ' + (isFinal ? 'ADMIS' : 'retenus') + '</h3>';
+    html += buildResultsTable(retenus, noteField, isFinal);
+  }
+  if (attente.length) {
+    html += '<h3 style="color:var(--warning); margin:25px 0 12px;">⏳ Liste d\'attente</h3>';
+    html += buildResultsTable(attente, noteField, isFinal);
+  }
+  container.innerHTML = html;
+}
+
+function buildResultsTable(list, noteField, isFinal) {
+  let html = `
+    <div class="table-wrapper">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>${isFinal ? '🏆 Rang' : '#'}</th>
+              <th>Code</th>
+              <th>Nom & Prénom</th>
+              <th>Poste</th>
+              ${noteField ? '<th>Note</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+  `;
+  list.forEach((c, i) => {
+    html += `
+      <tr>
+        <td><strong>${i + 1}</strong></td>
+        <td><code>${escapeHtml(c.code)}</code></td>
+        <td><strong>${escapeHtml(c.nom)}</strong> ${escapeHtml(c.prenom)}</td>
+        <td>${escapeHtml(c.poste)}</td>
+        ${noteField ? `<td><strong style="color:var(--primary);">${escapeHtml(c[noteField] || '-')}</strong></td>` : ''}
+      </tr>
+    `;
+  });
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+/* -----------------------------------------------------------
+   SYSTEME D'AUTHENTIFICATION ADMIN MULTI-COMPTES
+   Stockage : localStorage (clé chiffrée base64)
+   Fonctionnalités : multi-comptes, rôles, blocage tentatives,
+                     gestion des comptes depuis le dashboard
+   ----------------------------------------------------------- */
+
+const AUTH_STORAGE_KEY = 'onhym_admin_accounts';
+const AUTH_SESSION_KEY = 'onhym_admin_session';
+const MAX_ATTEMPTS = 5;
+const LOCK_DURATION = 60; // secondes
+
+// Initialiser les comptes par défaut au premier lancement
+function initDefaultAccounts() {
+  const existing = loadAccounts();
+  if (existing.length === 0) {
+    const defaults = [
+      { id: 'drh-001', login: 'admin', name: 'Administrateur principal', role: 'admin',
+        pwdHash: btoa('ONHYM2026'), active: true, createdAt: new Date().toISOString(), lastLogin: null },
+      { id: 'drh-002', login: 'drh.onhym', name: 'Direction RH', role: 'drh',
+        pwdHash: btoa('DRH@ONHYM2026'), active: true, createdAt: new Date().toISOString(), lastLogin: null }
+    ];
+    saveAccounts(defaults);
+  }
+}
+
+function loadAccounts() {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(atob(raw));
+  } catch(e) { return []; }
+}
+
+function saveAccounts(accounts) {
+  localStorage.setItem(AUTH_STORAGE_KEY, btoa(JSON.stringify(accounts)));
+}
+
+function getSession() {
+  try {
+    const raw = sessionStorage.getItem(AUTH_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function setSession(account) {
+  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
+    id: account.id, login: account.login, name: account.name,
+    role: account.role, loginAt: new Date().toISOString()
+  }));
+}
+
+// Gestion du blocage après trop de tentatives
+function getAttempts() {
+  try { return JSON.parse(localStorage.getItem('onhym_login_attempts') || '{"count":0,"lockedUntil":0}'); }
+  catch(e) { return {count:0, lockedUntil:0}; }
+}
+function saveAttempts(data) { localStorage.setItem('onhym_login_attempts', JSON.stringify(data)); }
+function resetAttempts() { localStorage.removeItem('onhym_login_attempts'); }
+
+let _lockTimer = null;
+
+function loginAdmin(e) {
+  e.preventDefault();
+
+  var login = document.getElementById('adminLogin').value.trim();
+  var pwd   = document.getElementById('adminPassword').value.trim();
+  var err   = document.getElementById('loginError');
+  var errMsg= document.getElementById('loginErrorMsg');
+
+  // Identifiants autorisés
+  var ok = (login === 'admin' && pwd === 'ONHYM2026') ||
+           (login === 'drh.onhym' && pwd === 'DRH@ONHYM2026');
+
+  if (!ok) {
+    err.style.display = 'flex';
+    errMsg.textContent = 'Identifiant ou mot de passe incorrect.';
+    document.getElementById('adminPassword').value = '';
+    return;
+  }
+
+  // Connexion réussie
+  err.style.display = 'none';
+
+  // Sauvegarder session
+  try {
+    sessionStorage.setItem('onhym_admin_session', JSON.stringify({
+      login: login,
+      name: login === 'admin' ? 'Administrateur principal' : 'Direction RH',
+      role: login === 'admin' ? 'admin' : 'drh',
+      loginAt: new Date().toISOString()
+    }));
+  } catch(ex) {}
+
+  // Masquer login, afficher dashboard
+  document.getElementById('loginBox').style.display = 'none';
+  var dash = document.getElementById('adminDashboard');
+  dash.style.display = 'block';
+  dash.classList.add('visible');
+
+  // Infos utilisateur dans le dashboard
+  var cu = document.getElementById('currentUserDisplay');
+  var cr = document.getElementById('currentRoleDisplay');
+  if (cu) cu.textContent = (login === 'admin' ? 'Administrateur' : 'Direction RH') + ' (' + login + ')';
+  if (cr) cr.textContent = login === 'admin' ? 'Admin complet' : 'DRH';
+
+  // Afficher panel candidats par défaut
+  showAdminPanel('candidats');
+  loadAdminData();
+
+  // Révéler la navigation
+  var navLinks = document.getElementById('navLinks');
+  var navLocked = document.getElementById('navLockedMsg');
+  if (navLinks) navLinks.style.display = 'contents';
+  if (navLocked) navLocked.style.display = 'none';
+
+  // Aller sur la page d'accueil
+  showPage('accueil');
+}
+
+
+function resetLoginBlock() {
+  localStorage.removeItem('onhym_login_attempts');
+  document.getElementById('loginLocked').style.display = 'none';
+  document.getElementById('loginError').style.display = 'none';
+  if (_lockTimer) clearInterval(_lockTimer);
+}
+
+function startLockCountdown(seconds) {
+  if (_lockTimer) clearInterval(_lockTimer);
+  let s = seconds;
+  document.getElementById('lockCountdown').textContent = s;
+  _lockTimer = setInterval(() => {
+    s--;
+    const el = document.getElementById('lockCountdown');
+    if (el) el.textContent = s;
+    if (s <= 0) {
+      clearInterval(_lockTimer);
+      const lockedBox = document.getElementById('loginLocked');
+      if (lockedBox) lockedBox.style.display = 'none';
+      resetAttempts();
+    }
+  }, 1000);
+}
+
+function logoutAdmin() {
+  sessionStorage.removeItem(AUTH_SESSION_KEY);
+  document.getElementById('loginBox').style.display = 'block';
+  const dash2 = document.getElementById('adminDashboard');
+  dash2.style.display = 'none';
+  dash2.classList.remove('visible');
+  document.getElementById('adminPassword').value = '';
+  document.getElementById('adminLogin').value = '';
+  document.getElementById('loginError').style.display = 'none';
+
+  // Masquer les liens de navigation
+  const navLinks2 = document.getElementById('navLinks');
+  const navLocked2 = document.getElementById('navLockedMsg');
+  if (navLinks2) navLinks2.style.display = 'none';
+  if (navLocked2) navLocked2.style.display = 'inline-block';
+}
+
+function togglePwdVisibility(fieldId) {
+  const field = document.getElementById(fieldId || 'adminPassword');
+  if (field) field.type = field.type === 'password' ? 'text' : 'password';
+}
+
+function showAdminPanel(panel) {
+  ['candidats','postes','comptes'].forEach(p => {
+    const el = document.getElementById('adminPanel-' + p);
+    const btn = document.getElementById('btn-panel-' + p);
+    if (el) el.style.display = p === panel ? 'block' : 'none';
+    if (btn) { btn.classList.toggle('btn-secondary', p === panel); btn.classList.toggle('btn-ghost', p !== panel); }
+  });
+  if (panel === 'comptes') renderAccountsTable();
+  if (panel === 'postes')  renderPostesTable();
+}
+
+/* ================================================================
+   ÉDITEUR DE POSTES — Gestion complète depuis l'espace admin
+   Stockage : localStorage (clé onhym_postes)
+   ================================================================ */
+
+const POSTES_KEY = 'onhym_postes_v1';
+
+// Charger les postes depuis localStorage ou OFFRES_DEMO
+function loadPostes() {
+  try {
+    const raw = localStorage.getItem(POSTES_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && data.length > 0) return data;
+    }
+  } catch(e) {}
+  // Initialiser avec les données intégrées
+  localStorage.setItem(POSTES_KEY, JSON.stringify(OFFRES_DEMO));
+  return JSON.parse(JSON.stringify(OFFRES_DEMO));
+}
+
+function savePostes(postes) {
+  localStorage.setItem(POSTES_KEY, JSON.stringify(postes));
+  // Mettre à jour _allOffres pour l'affichage public
+  _allOffres = postes.filter(p => p.visible !== 'FALSE' && ['ouvert','open',''].includes((p.statut||'').toLowerCase()));
+  updateFilterCounts();
+}
+
+// Afficher les stats en haut du panel
+function renderPostesStats(postes) {
+  const el = document.getElementById('postesStats');
+  if (!el) return;
+  const total  = postes.length;
+  const cadre  = postes.filter(p => p.categorie === 'cadre').length;
+  const mait   = postes.filter(p => p.categorie === 'maitrise').length;
+  const classe = postes.filter(p => p.categorie === 'classe').length;
+  const stats  = [
+    { label:'Total postes', val: total,  color:'#002551' },
+    { label:'Cadres',       val: cadre,  color:'#1565C0' },
+    { label:'Maîtrises',    val: mait,   color:'#283593' },
+    { label:'Classés',      val: classe, color:'#1A6B3C' },
+  ];
+  el.innerHTML = stats.map(s => `
+    <div style="background:#fff; border:1.5px solid #E0E7F0; border-radius:10px; padding:12px; text-align:center;">
+      <div style="font-size:26px; font-weight:700; color:${s.color};">${s.val}</div>
+      <div style="font-size:12px; color:#666;">${s.label}</div>
+    </div>`).join('');
+}
+
+// Rendre le tableau des postes
+function renderPostesTable() {
+  const postes = loadPostes();
+  renderPostesStats(postes);
+  const tbody = document.getElementById('postesTableBody');
+  if (!tbody) return;
+  const catColors = { cadre:'#1565C0', maitrise:'#283593', classe:'#1A6B3C' };
+  const catLabels = { cadre:'Cadre', maitrise:'Maîtrise', classe:'Classé' };
+  tbody.innerHTML = postes.map((p, i) => `
+    <tr style="background:${i%2===0?'#fff':'#F8FAFC'}; border-bottom:1px solid #E8EDF5;">
+      <td style="padding:8px; font-weight:600; color:var(--primary); font-size:12px;">${escapeHtml(p.id)}</td>
+      <td style="padding:8px; font-weight:500;">${escapeHtml(p.titre)}</td>
+      <td style="padding:8px; text-align:center;">
+        <span style="background:${catColors[p.categorie]||'#666'}20; color:${catColors[p.categorie]||'#666'}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">
+          ${catLabels[p.categorie] || p.categorie}
+        </span>
+      </td>
+      <td style="padding:8px; text-align:center; font-size:12px;">${escapeHtml(p.niveau||'')}</td>
+      <td style="padding:8px; font-size:12px;">${escapeHtml(p.lieu||'')}</td>
+      <td style="padding:8px; text-align:center; font-weight:700; color:var(--primary);">${escapeHtml(p.nb_postes||'')}</td>
+      <td style="padding:8px; text-align:center; font-size:12px;">${escapeHtml(p.date_limite||'')}</td>
+      <td style="padding:8px; text-align:center;">
+        <span style="background:${p.statut==='Ouvert'?'#E8F5E9':'#FFF3E0'}; color:${p.statut==='Ouvert'?'#2E7D32':'#E65100'}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">
+          ${escapeHtml(p.statut||'Ouvert')}
+        </span>
+      </td>
+      <td style="padding:8px; text-align:center;">
+        <button onclick="editPoste('${escapeHtml(p.id)}')" style="background:var(--primary); color:#fff; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px; margin-right:4px;">✏️</button>
+        <button onclick="togglePosteStatut('${escapeHtml(p.id)}')" style="background:#F0AD00; color:#fff; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px; margin-right:4px;" title="${p.statut==='Ouvert'?'Clôturer':'Ouvrir'}">${p.statut==='Ouvert'?'🔒':'🔓'}</button>
+        <button onclick="deletePoste('${escapeHtml(p.id)}')" style="background:#C62828; color:#fff; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px;">🗑</button>
+      </td>
+    </tr>`).join('');
+}
+
+// Afficher le formulaire vide (nouveau poste)
+function showPosteForm() {
+  const postes = loadPostes();
+  const lastId = postes.length > 0 ? postes[postes.length-1].id : 'ONH-2026-00';
+  const num    = parseInt(lastId.split('-')[2] || 0) + 1;
+  const year   = new Date().getFullYear();
+  document.getElementById('pf_id').value           = `ONH-${year}-${String(num).padStart(2,'0')}`;
+  document.getElementById('pf_titre').value         = '';
+  document.getElementById('pf_categorie').value     = 'cadre';
+  document.getElementById('pf_niveau').value        = '';
+  document.getElementById('pf_specialite').value    = '';
+  document.getElementById('pf_departement').value   = '';
+  document.getElementById('pf_lieu').value          = 'Rabat';
+  document.getElementById('pf_nb_postes').value     = '1';
+  document.getElementById('pf_date_publication').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pf_date_limite').value   = '';
+  document.getElementById('pf_experience').value    = '0';
+  document.getElementById('pf_statut').value        = 'Ouvert';
+  document.getElementById('pf_description').value   = '';
+  document.getElementById('pf_id').readOnly         = false;
+  document.getElementById('posteFormTitle').textContent = '➕ Nouveau poste';
+  document.getElementById('posteFormPanel').style.display = 'block';
+  document.getElementById('pf_titre').focus();
+}
+
+// Pré-remplir le formulaire pour édition
+function editPoste(id) {
+  const postes = loadPostes();
+  const p = postes.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('pf_id').value            = p.id;
+  document.getElementById('pf_titre').value          = p.titre || '';
+  document.getElementById('pf_categorie').value      = p.categorie || 'cadre';
+  document.getElementById('pf_niveau').value         = p.niveau || '';
+  document.getElementById('pf_specialite').value     = p.specialite || '';
+  document.getElementById('pf_departement').value    = p.departement || '';
+  document.getElementById('pf_lieu').value           = p.lieu || '';
+  document.getElementById('pf_nb_postes').value      = p.nb_postes || '1';
+  document.getElementById('pf_date_publication').value = p.date_publication || '';
+  document.getElementById('pf_date_limite').value    = p.date_limite || '';
+  document.getElementById('pf_experience').value     = p.experience || '0';
+  document.getElementById('pf_statut').value         = p.statut || 'Ouvert';
+  document.getElementById('pf_description').value    = p.description || '';
+  document.getElementById('pf_id').readOnly          = true;
+  document.getElementById('posteFormTitle').textContent = '✏️ Modifier — ' + p.titre;
+  document.getElementById('posteFormPanel').style.display = 'block';
+  document.getElementById('posteFormPanel').scrollIntoView({ behavior:'smooth' });
+}
+
+// Sauvegarder (ajout ou modification)
+function savePoste() {
+  const id    = document.getElementById('pf_id').value.trim();
+  const titre = document.getElementById('pf_titre').value.trim();
+  const dlim  = document.getElementById('pf_date_limite').value;
+  if (!id)    { alert('L ID est obligatoire.'); return; }
+  if (!titre) { alert('Le titre est obligatoire.'); return; }
+  if (!dlim)  { alert('La date limite est obligatoire.'); return; }
+
+  const postes = loadPostes();
+  const existing = postes.findIndex(p => p.id === id);
+  const newPoste = {
+    id,
+    titre,
+    categorie:         document.getElementById('pf_categorie').value,
+    niveau:            document.getElementById('pf_niveau').value.trim(),
+    specialite:        document.getElementById('pf_specialite').value.trim(),
+    departement:       document.getElementById('pf_departement').value.trim(),
+    lieu:              document.getElementById('pf_lieu').value.trim(),
+    nb_postes:         document.getElementById('pf_nb_postes').value,
+    date_publication:  document.getElementById('pf_date_publication').value,
+    date_limite:       dlim,
+    experience:        document.getElementById('pf_experience').value,
+    statut:            document.getElementById('pf_statut').value,
+    description:       document.getElementById('pf_description').value.trim(),
+    visible:           'TRUE',
+    date_publiee:      document.getElementById('pf_date_publication').value,
+  };
+
+  if (existing >= 0) {
+    postes[existing] = newPoste;
+    alert('✅ Poste modifié avec succès !');
+  } else {
+    // Vérifier unicité ID
+    if (postes.some(p => p.id === id)) {
+      alert('❌ Cet ID existe déjà. Choisissez un autre ID.'); return;
+    }
+    postes.push(newPoste);
+    alert('✅ Nouveau poste ajouté avec succès !');
+  }
+  savePostes(postes);
+  hidePosteForm();
+  renderPostesTable();
+}
+
+function hidePosteForm() {
+  document.getElementById('posteFormPanel').style.display = 'none';
+}
+
+// Basculer statut Ouvert ↔ Clôturé
+function togglePosteStatut(id) {
+  const postes = loadPostes();
+  const p = postes.find(x => x.id === id);
+  if (!p) return;
+  p.statut = p.statut === 'Ouvert' ? 'Cloture' : 'Ouvert';
+  savePostes(postes);
+  renderPostesTable();
+}
+
+// Supprimer un poste
+function deletePoste(id) {
+  if (!confirm('Supprimer le poste ' + id + ' ? Cette action est irreversible.')) return;
+  const postes = loadPostes().filter(p => p.id !== id);
+  savePostes(postes);
+  renderPostesTable();
+  alert('✅ Poste supprimé.');
+}
+
+// Recharger depuis les données intégrées
+function importPostesFromDemo() {
+  if (!confirm('Recharger tous les postes depuis les données intégrées ? Vos modifications seront perdues.')) return;
+  localStorage.removeItem(POSTES_KEY);
+  savePostes(JSON.parse(JSON.stringify(OFFRES_DEMO)));
+  renderPostesTable();
+  alert('✅ Postes rechargés depuis les données ONHYM.');
+}
+
+// Export CSV des postes
+// Export CSV des postes
+function exportPostesCSV() {
+  var postes = loadPostes();
+  var cols = ['id','titre','categorie','niveau','specialite','departement','lieu','nb_postes','date_publication','date_limite','experience','statut','description'];
+  var lines = [cols.join(',')];
+  for (var i = 0; i < postes.length; i++) {
+    var p = postes[i];
+    var row = cols.map(function(c) {
+      var v = (p[c] || '').toString().replace(/"/g, '""');
+      return '"' + v + '"';
+    });
+    lines.push(row.join(','));
+  }
+  var csv = lines.join(String.fromCharCode(13,10));
+  var blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8;'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ONHYM_Offres_export_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+}
+
+/* ---  GESTION DES COMPTES --- */
+
+function renderAccountsTable() {
+  initDefaultAccounts();
+  const accounts = loadAccounts();
+  const tbody = document.getElementById('accountsTableBody');
+  const session = getSession();
+  const roleLabels = { admin:'🔑 Admin complet', drh:'🗂 DRH', lecture:'👁 Lecture seule' };
+
+  tbody.innerHTML = accounts.map(a => `
+    <tr>
+      <td><code>${escapeHtml(a.login)}</code></td>
+      <td>${escapeHtml(a.name)}</td>
+      <td>${roleLabels[a.role] || a.role}</td>
+      <td style="font-size:0.85em;">${a.lastLogin ? formatDate(a.lastLogin) : '—'}</td>
+      <td><span style="background:${a.active?'#e8f5e9':'#ffebee'};color:${a.active?'#2e7d32':'#c62828'};padding:3px 10px;border-radius:4px;font-size:0.82em;font-weight:600;">${a.active?'✅ Actif':'❌ Inactif'}</span></td>
+      <td>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.82em;" onclick="editAccount('${a.id}')">✏️ Modifier</button>
+        ${a.login !== (session && session.login) ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:0.82em;color:${a.active?'var(--danger)':'var(--success)'};" onclick="toggleAccount('${a.id}')">${a.active?'🔒 Désactiver':'🔓 Activer'}</button>` : '<span style="font-size:0.8em;color:var(--gray-600);">(compte actif)</span>'}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function showAddAccountModal() {
+  document.getElementById('accountEditId').value = '';
+  document.getElementById('accountModalTitle').textContent = '➕ Ajouter un compte';
+  document.getElementById('accLogin').value = '';
+  document.getElementById('accName').value = '';
+  document.getElementById('accPassword').value = '';
+  document.getElementById('accPassword').placeholder = 'Min. 8 caractères';
+  document.getElementById('accRole').value = 'drh';
+  document.getElementById('accountModal').style.display = 'block';
+}
+
+function editAccount(id) {
+  const accounts = loadAccounts();
+  const acc = accounts.find(a => a.id === id);
+  if (!acc) return;
+  document.getElementById('accountEditId').value = id;
+  document.getElementById('accountModalTitle').textContent = '✏️ Modifier le compte';
+  document.getElementById('accLogin').value = acc.login;
+  document.getElementById('accName').value = acc.name;
+  document.getElementById('accPassword').value = '';
+  document.getElementById('accPassword').placeholder = 'Laisser vide pour ne pas changer';
+  document.getElementById('accRole').value = acc.role;
+  document.getElementById('accountModal').style.display = 'block';
+}
+
+function hideAccountModal() {
+  document.getElementById('accountModal').style.display = 'none';
+}
+
+function saveAccount(e) {
+  e.preventDefault();
+  const id = document.getElementById('accountEditId').value;
+  const login = document.getElementById('accLogin').value.trim();
+  const name = document.getElementById('accName').value.trim();
+  const pwd = document.getElementById('accPassword').value;
+  const role = document.getElementById('accRole').value;
+
+  if (!id && pwd.length < 8) { alert('Le mot de passe doit contenir au moins 8 caractères.'); return; }
+
+  const accounts = loadAccounts();
+
+  // Vérifier unicité du login (sauf pour le compte en édition)
+  const duplicate = accounts.find(a => a.login === login && a.id !== id);
+  if (duplicate) { alert('Cet identifiant est déjà utilisé.'); return; }
+
+  if (id) {
+    // Mise à jour
+    const idx = accounts.findIndex(a => a.id === id);
+    if (idx >= 0) {
+      accounts[idx].login = login;
+      accounts[idx].name = name;
+      accounts[idx].role = role;
+      if (pwd) accounts[idx].pwdHash = btoa(pwd);
+    }
+  } else {
+    // Nouveau compte
+    accounts.push({
+      id: 'acc-' + Date.now(),
+      login, name, role,
+      pwdHash: btoa(pwd),
+      active: true,
+      createdAt: new Date().toISOString(),
+      lastLogin: null
+    });
+  }
+
+  saveAccounts(accounts);
+  hideAccountModal();
+  renderAccountsTable();
+  alert('✅ Compte ' + (id ? 'modifié' : 'créé') + ' avec succès.');
+}
+
+function toggleAccount(id) {
+  const accounts = loadAccounts();
+  const acc = accounts.find(a => a.id === id);
+  if (!acc) return;
+  acc.active = !acc.active;
+  saveAccounts(accounts);
+  renderAccountsTable();
+}
+
+/* -----------------------------------------------------------
+   ETAPE 5 : TABLEAU DE BORD ADMINISTRATEUR
+   - KPIs dynamiques
+   - Table complète des candidats avec recherche
+   - Export CSV
+   ----------------------------------------------------------- */
+
+let _adminData = [];
+
+async function loadAdminData() {
+  const tbody = document.getElementById('adminTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;"><div class="spinner"></div><br>Chargement...</td></tr>';
+
+  let data = null;
+  if (CONFIG.SHEET_SUIVI_CSV && !CONFIG.SHEET_SUIVI_CSV.includes('REMPLACER_ID')) {
+    data = await fetchCSV(CONFIG.SHEET_SUIVI_CSV);
+  }
+  if (!data || data.length === 0) {
+    data = SUIVI_DEMO;
+    // Ajouter quelques candidats supplémentaires pour la démo admin
+    data = [...data,
+      { code:'ONHYM-2026-00104', nom:'RAMI', prenom:'Aicha', email:'aicha.rami@example.com', poste:'ONH-2026-05', categorie:'cadre', diplome:'Ingénieur Mines', statut_preselection:'retenu', statut_ecrit:'admis', statut_oral1:'en_cours', statut_oral2:'en_attente', note_ecrit:'14/20', note_oral1:'', note_oral2:'', statut_final:'en_cours', date_maj:'2026-04-23' },
+      { code:'ONHYM-2026-00105', nom:'SAIDI', prenom:'Karim', email:'karim.saidi@example.com', poste:'ONH-2026-13', categorie:'classe', diplome:'BAC Sciences Économiques', statut_preselection:'retenu', statut_ecrit:'admis', statut_oral1:'admis', statut_oral2:'admis', note_ecrit:'15/20', note_oral1:'13/20', note_oral2:'14/20', statut_final:'admis', date_maj:'2026-04-21' },
+      { code:'ONHYM-2026-00106', nom:'OUMARI', prenom:'Salma', email:'salma.oumari@example.com', poste:'ONH-2026-11', categorie:'maitrise', diplome:'DUT Chimie', statut_preselection:'retenu', statut_ecrit:'admis', statut_oral1:'admis', statut_oral2:'attente', note_ecrit:'13/20', note_oral1:'12/20', note_oral2:'11/20', statut_final:'attente', date_maj:'2026-04-22' }
+    ];
+  }
+  _adminData = data;
+  renderAdminKpis();
+  renderAdminTable(_adminData);
+}
+
+function renderAdminKpis() {
+  const total = _adminData.length;
+  const preselect = _adminData.filter(c => c.statut_preselection === 'retenu').length;
+  const admis = _adminData.filter(c => c.statut_final === 'admis').length;
+
+  document.getElementById('kpiTotal').textContent = total;
+  document.getElementById('kpiPreselect').textContent = preselect;
+  document.getElementById('kpiAdmis').textContent = admis;
+  document.getElementById('kpiReclam').textContent = '—'; // à relier au Google Form réclamations
+}
+
+function renderAdminTable(data) {
+  const tbody = document.getElementById('adminTableBody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;">Aucune candidature.</td></tr>';
+    return;
+  }
+  const catLabels = { cadre:'🎓 Cadre', maitrise:'📘 Maîtrise', classe:'📗 Classé' };
+  const statutColors = {
+    'admis':     { bg:'#e8f5e9', col:'#2e7d32', lbl:'✅ Admis' },
+    'attente':   { bg:'#fff4d6', col:'#ed6c02', lbl:'⏳ Liste attente' },
+    'rejete':    { bg:'#ffebee', col:'#c62828', lbl:'❌ Rejeté' },
+    'en_cours':  { bg:'#e3f2fd', col:'#1565c0', lbl:'🔄 En cours' }
+  };
+
+  tbody.innerHTML = data.map(c => {
+    const s = statutColors[c.statut_final] || statutColors['en_cours'];
+    return `
+      <tr>
+        <td><code style="font-size:0.85em;">${escapeHtml(c.code)}</code></td>
+        <td><strong>${escapeHtml(c.nom)}</strong> ${escapeHtml(c.prenom)}</td>
+        <td><a href="mailto:${escapeHtml(c.email)}" style="font-size:0.9em;">${escapeHtml(c.email)}</a></td>
+        <td>${escapeHtml(c.poste)}</td>
+        <td>${catLabels[c.categorie] || c.categorie}</td>
+        <td style="font-size:0.88em;">${escapeHtml(c.diplome)}</td>
+        <td><span style="background:${s.bg}; color:${s.col}; padding:3px 10px; border-radius:4px; font-size:0.82em; font-weight:600;">${s.lbl}</span></td>
+      </tr>`;
+  }).join('');
+}
+
+function filterAdminTable() {
+  const q = document.getElementById('searchAdmin').value.toLowerCase().trim();
+  if (!q) { renderAdminTable(_adminData); return; }
+  const filtered = _adminData.filter(c =>
+    Object.values(c).some(v => String(v || '').toLowerCase().includes(q))
+  );
+  renderAdminTable(filtered);
+}
+
+function exportCSV() {
+  if (!_adminData.length) { alert('Aucune donnée à exporter.'); return; }
+  const headers = Object.keys(_adminData[0]);
+  const rows = [headers.join(',')];
+  _adminData.forEach(c => {
+    rows.push(headers.map(h => {
+      const v = String(c[h] || '');
+      return v.includes(',') || v.includes('"') ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }).join(','));
+  });
+  const csv = '\ufeff' + rows.join('\n'); // BOM pour Excel
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `candidatures_ONHYM_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* -----------------------------------------------------------
+   INIT
+   ----------------------------------------------------------- */
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('✅ ONHYM Recrutement - Plateforme initialisée');
+  console.log('📋 Configuration :', CONFIG);
+
+  // Restaurer la langue préférée de l'utilisateur
+  const savedLang = localStorage.getItem('onhym_lang') || 'fr';
+  if (savedLang === 'ar') switchLang('ar');
+});
+</script>
+
+</body>
+</html>
