@@ -3453,13 +3453,51 @@ function deletePoste(id) {
   alert('✅ Poste supprimé.');
 }
 
-// Recharger depuis les données intégrées
+// Recharger depuis Google Sheets (priorité) ou données intégrées (fallback)
 function importPostesFromDemo() {
-  if (!confirm('Recharger tous les postes depuis les données intégrées ? Vos modifications seront perdues.')) return;
-  localStorage.removeItem(POSTES_KEY);
-  savePostes(JSON.parse(JSON.stringify(OFFRES_DEMO)));
-  renderPostesTable();
-  alert('✅ Postes rechargés depuis les données ONHYM.');
+  if (!confirm('Recharger les postes depuis Google Sheets ?\nSi indisponible, les données intégrées seront utilisées.')) return;
+
+  var btn = document.querySelector('[onclick="importPostesFromDemo()"]');
+  if (btn) { btn.textContent = '⏳ Chargement...'; btn.disabled = true; }
+
+  fetchCSV(CONFIG.SHEET_OFFRES_CSV).then(function(data) {
+    if (data && data.length > 0) {
+      // Normaliser les catégories
+      data = data.map(function(o) {
+        if (o.categorie) {
+          var c = o.categorie.trim().toLowerCase();
+          if (c.indexOf('cadre') >= 0 || c.indexOf('ing') >= 0) o.categorie = 'cadre';
+          else if (c.indexOf('maitrise') >= 0 || c.indexOf('tech') >= 0 || c.indexOf('bac+2') >= 0) o.categorie = 'maitrise';
+          else if (c.indexOf('class') >= 0 || c.indexOf('agent') >= 0 || c.indexOf('bac') >= 0) o.categorie = 'classe';
+        }
+        if (!o.visible) o.visible = 'TRUE';
+        if (!o.statut)  o.statut  = 'Ouvert';
+        return o;
+      }).filter(function(o) {
+        return o.visible.toUpperCase() !== 'FALSE' &&
+               ['ouvert','open',''].indexOf(o.statut.toLowerCase()) >= 0;
+      });
+
+      localStorage.removeItem(POSTES_KEY);
+      savePostes(data);
+      renderPostesTable();
+      if (btn) { btn.textContent = '🔄 Recharger depuis Sheets'; btn.disabled = false; }
+      alert('✅ ' + data.length + ' postes chargés depuis Google Sheets !');
+    } else {
+      // Fallback : données intégrées
+      localStorage.removeItem(POSTES_KEY);
+      savePostes(JSON.parse(JSON.stringify(OFFRES_DEMO)));
+      renderPostesTable();
+      if (btn) { btn.textContent = '🔄 Recharger depuis Sheets'; btn.disabled = false; }
+      alert('⚠️ Google Sheets inaccessible.\n' + OFFRES_DEMO.length + ' postes intégrés chargés.');
+    }
+  }).catch(function(e) {
+    localStorage.removeItem(POSTES_KEY);
+    savePostes(JSON.parse(JSON.stringify(OFFRES_DEMO)));
+    renderPostesTable();
+    if (btn) { btn.textContent = '🔄 Recharger depuis Sheets'; btn.disabled = false; }
+    alert('⚠️ Erreur : ' + e.message + '\nDonnées intégrées chargées.');
+  });
 }
 
 // Export CSV des postes
