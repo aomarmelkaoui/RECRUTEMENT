@@ -11,9 +11,12 @@
      ============================================================ -->
 <script>
 const CONFIG = {
-  // URL Google Sheets publie en CSV pour les avis de concours
-  // Publier : Fichier > Partager > Publier sur le Web > format CSV
-  SHEET_OFFRES_CSV: "https://docs.google.com/spreadsheets/d/e/REMPLACER_ID/pub?output=csv&gid=0",
+  // URL Google Sheets ONHYM_Offres — publiée sur le web
+  // Format pubhtml (Feuille 1) — détection auto CSV/HTML dans fetchCSV()
+  // Lien fourni par l'utilisateur le 09/05/2026
+  SHEET_OFFRES_CSV: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQS-d-ikoRWeEGp13pdyirI-CO2bRAcqUCszqTCspbEkfndp0qNXsQOcOSwrNlIHB0URwV_EERt9kE5/pub?output=csv&gid=0",
+  // URL pubhtml alternative (si CSV bloqué)
+  SHEET_OFFRES_HTML: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQS-d-ikoRWeEGp13pdyirI-CO2bRAcqUCszqTCspbEkfndp0qNXsQOcOSwrNlIHB0URwV_EERt9kE5/pubhtml?gid=0&single=true",
 
   // URL Google Sheets publie en CSV pour le suivi des candidatures
   SHEET_SUIVI_CSV: "https://docs.google.com/spreadsheets/d/e/REMPLACER_ID/pub?output=csv&gid=1",
@@ -22,7 +25,11 @@ const CONFIG = {
   SHEET_RESULTATS_CSV: "https://docs.google.com/spreadsheets/d/e/REMPLACER_ID/pub?output=csv&gid=2",
 
   // URL Google Form pour candidature (mode embed)
-  FORM_CANDIDATURE: "https://docs.google.com/forms/d/e/REMPLACER_ID/viewform?embedded=true",
+  // Formulaire de candidature "Candidature ONHYM 2026"
+  // Formulaire "Candidature ONHYM 2026" — URL publique confirmée ✅
+  // Lien court : https://forms.gle/cJHjgLia5t2pGDtR8
+  // ID public  : 1FAIpQLSf-QGtgv45W7liIbTPstYRNcQb9m646Y_IOAtJLLshQkdw1oA
+  FORM_CANDIDATURE: "https://docs.google.com/forms/d/e/1FAIpQLSf-QGtgv45W7liIbTPstYRNcQb9m646Y_IOAtJLLshQkdw1oA/viewform?embedded=true",
 
   // (optionnel) IDs des champs Google Forms pour pré-remplissage automatique
   // Pour les obtenir : ouvrir le Form > 3 points > "Obtenir le lien pré-rempli", inspecter l'URL (entry.XXX)
@@ -30,10 +37,14 @@ const CONFIG = {
   FORM_PREFILL_OFFRE_ENTRY: "", // ex: "entry.987654321"
 
   // URL Google Form pour reclamation
-  FORM_RECLAMATION: "https://docs.google.com/forms/d/e/REMPLACER_ID/viewform?embedded=true",
+  // Formulaire "Réclamation ONHYM 2026" — URL publique confirmée ✅
+  // ID public : 1FAIpQLSccNe2Xs6NLBdIt5zY61P14O1PoRt915TfqPBqApim2gH82VQ
+  FORM_RECLAMATION: "https://docs.google.com/forms/d/e/1FAIpQLSccNe2Xs6NLBdIt5zY61P14O1PoRt915TfqPBqApim2gH82VQ/viewform?embedded=true",
 
   // Mot de passe admin (cote client - a changer ou utiliser un backend)
-  ADMIN_PASSWORD: "ONHYM2026",
+  // Authentification admin — stockage localStorage chiffré
+  // Ne pas modifier ici : utiliser le panneau "Gestion des comptes" dans l'espace admin
+  ADMIN_PASSWORD: "ONHYM2026", // compte legacy conservé pour compatibilité
 
   // Informations institution
   NOM_INSTITUTION: "ONHYM",
@@ -753,6 +764,9 @@ section.section-alt {
 .dashboard {
   display: none;
 }
+.dashboard.visible {
+  display: block !important;
+}
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -981,13 +995,16 @@ footer {
   </div>
   <nav>
     <div class="container" id="mainNav">
-      <a onclick="showPage('accueil')" class="active" data-i18n="nav_home">🏠 Accueil</a>
+      <span id="navLockedMsg" style="color:rgba(255,255,255,0.6); font-size:0.88em; padding:14px 22px; display:inline-block;">🔒 Veuillez vous connecter pour accéder à la plateforme</span>
+      <div id="navLinks" style="display:none; contents:contents;">
+      <a onclick="showPage('accueil')" data-i18n="nav_home">🏠 Accueil</a>
       <a onclick="showPage('offres')" data-i18n="nav_offers">📋 Avis de concours</a>
       <a onclick="showPage('candidature')" data-i18n="nav_apply">✍️ Postuler</a>
       <a onclick="showPage('suivi')" data-i18n="nav_track">🔍 Suivre ma candidature</a>
       <a onclick="showPage('resultats')" data-i18n="nav_results">🏆 Résultats</a>
       <a onclick="showPage('reclamation')" data-i18n="nav_claim">⚠️ Réclamation</a>
-      <a onclick="showPage('admin')" data-i18n="nav_admin">🔒 Espace Admin</a>
+      <a onclick="showPage('admin')" class="active" data-i18n="nav_admin">🔒 Espace Admin</a>
+      </div>
     </div>
   </nav>
 </header>
@@ -995,7 +1012,7 @@ footer {
 <!-- ============================================================
      PAGE : ACCUEIL
      ============================================================ -->
-<div id="page-accueil" class="page active">
+<div id="page-accueil" class="page">
   <section class="hero">
     <div class="container">
       <h2 data-i18n="hero_title">Plateforme de Recrutement ONHYM</h2>
@@ -1027,6 +1044,12 @@ footer {
       </div>
     </div>
   </section>
+
+  <!-- Bannière admin connecté (visible seulement après connexion) -->
+  <div id="adminWelcomeBanner" class="alert alert-success" style="display:none; margin:0; border-radius:0; border-left:none; border-top:none; border-bottom:4px solid var(--accent); background:#e8f5e9; padding:12px 40px;">
+    <span class="alert-icon">🔒</span>
+    <div id="adminWelcomeMsg" style="font-size:0.95em;"></div>
+  </div>
 
   <section class="section-alt">
     <div class="container">
@@ -1110,11 +1133,15 @@ footer {
         <h2 data-i18n="offers_title">Avis de concours</h2>
         <p data-i18n="offers_subtitle">Consultez les 30 postes ouverts au recrutement</p>
       </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+        <div id="offresLastUpdate" style="font-size:0.82em; color:var(--gray-600);"></div>
+        <button class="btn btn-ghost" style="padding:6px 14px; font-size:0.85em;" onclick="reloadOffres()">🔄 Actualiser les offres</button>
+      </div>
       <div class="filter-bar">
-        <button class="filter-btn active" onclick="filterOffers('all', this)" data-i18n="filter_all">Tous (30)</button>
-        <button class="filter-btn" onclick="filterOffers('cadre', this)" data-i18n="filter_cadre">🎓 Ingénieurs & Cadres (11)</button>
-        <button class="filter-btn" onclick="filterOffers('maitrise', this)" data-i18n="filter_maitrise">📘 Maîtrises BAC+2 (9)</button>
-        <button class="filter-btn" onclick="filterOffers('classe', this)" data-i18n="filter_classe">📗 Classés BAC (10)</button>
+        <button class="filter-btn active" onclick="filterOffers('all', this)" id="filter-all" data-i18n="filter_all">Tous (30)</button>
+        <button class="filter-btn" onclick="filterOffers('cadre', this)" id="filter-cadre" data-i18n="filter_cadre">🎓 Ingénieurs & Cadres (11)</button>
+        <button class="filter-btn" onclick="filterOffers('maitrise', this)" id="filter-maitrise" data-i18n="filter_maitrise">📘 Maîtrises BAC+2 (9)</button>
+        <button class="filter-btn" onclick="filterOffers('classe', this)" id="filter-classe" data-i18n="filter_classe">📗 Classés BAC (10)</button>
       </div>
       <div id="offersContainer">
         <div class="loader"><div class="spinner"></div><p>Chargement des offres...</p></div>
@@ -1131,7 +1158,7 @@ footer {
     <div class="container">
       <div class="section-title">
         <h2>Formulaire de candidature</h2>
-        <p>Remplissez attentivement le formulaire ci-dessous</p>
+        <p>Candidature ONHYM 2026 — Remplissez attentivement le formulaire ci-dessous</p>
       </div>
       <div class="form-wrapper">
         <div class="form-instructions">
@@ -1145,15 +1172,19 @@ footer {
           </ul>
           <p style="margin-top: 10px;"><strong>⚠️ Un accusé de réception vous sera envoyé par email après soumission.</strong></p>
         </div>
-        <iframe id="formCandidature" src="about:blank" title="Formulaire de candidature">
+        <iframe id="formCandidature" src="about:blank" title="Formulaire de candidature - Candidature ONHYM 2026">
           Chargement du formulaire...
         </iframe>
+        <div style="text-align:right; margin-top:8px;">
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLSf-QGtgv45W7liIbTPstYRNcQb9m646Y_IOAtJLLshQkdw1oA/viewform" target="_blank" style="font-size:0.85em; color:var(--gray-600);">
+            🔗 Ouvrir le formulaire dans un nouvel onglet
+          </a>
+        </div>
         <div class="alert alert-info" id="formFallback" style="display:none;">
           <span class="alert-icon">ℹ️</span>
           <div>
-            <strong>Formulaire en cours de configuration.</strong><br>
-            Le formulaire Google Forms sera intégré ici une fois l'URL configurée dans <code>CONFIG.FORM_CANDIDATURE</code>.
-            Consultez le guide d'installation pour plus d'informations.
+            <strong>Formulaire "Candidature ONHYM 2026" configuré.</strong><br>
+            Si le formulaire ne s'affiche pas, <a href="https://docs.google.com/forms/d/e/1FAIpQLSf-QGtgv45W7liIbTPstYRNcQb9m646Y_IOAtJLLshQkdw1oA/viewform" target="_blank" style="color:var(--primary); font-weight:600;">cliquez ici pour l'ouvrir dans un nouvel onglet ↗</a>
           </div>
         </div>
       </div>
@@ -1214,6 +1245,13 @@ footer {
       </div>
       <div id="tab-oral2" class="tab-content">
         <div id="resultsOral2" class="loader"><div class="spinner"></div><p>Chargement...</p></div>
+        </div>
+        </div><!-- fin adminPanel-candidats -->
+
+
+
+
+
       </div>
     </div>
   </section>
@@ -1238,9 +1276,14 @@ footer {
             <li>Merci de préciser votre code candidat pour un traitement plus rapide</li>
           </ul>
         </div>
-        <iframe id="formReclamation" src="about:blank" title="Formulaire de réclamation">
+        <iframe id="formReclamation" src="about:blank" title="Formulaire de réclamation ONHYM 2026">
           Chargement du formulaire...
         </iframe>
+        <div style="text-align:right; margin-top:8px;">
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLSccNe2Xs6NLBdIt5zY61P14O1PoRt915TfqPBqApim2gH82VQ/viewform" target="_blank" style="font-size:0.85em; color:var(--gray-600);">
+            🔗 Ouvrir le formulaire de réclamation dans un nouvel onglet
+          </a>
+        </div>
       </div>
     </div>
   </section>
@@ -1249,7 +1292,7 @@ footer {
 <!-- ============================================================
      PAGE : ADMIN
      ============================================================ -->
-<div id="page-admin" class="page">
+<div id="page-admin" class="page active">
   <section>
     <div class="container">
       <div class="section-title">
@@ -1259,12 +1302,29 @@ footer {
       <div id="loginBox" class="login-box">
         <div class="icon">🔒</div>
         <h3>Connexion sécurisée</h3>
-        <form onsubmit="loginAdmin(event)">
+        <div id="loginError" class="alert alert-danger" style="display:none; margin-bottom:15px; text-align:left;">
+          <span class="alert-icon">❌</span>
+          <div id="loginErrorMsg">Identifiants incorrects.</div>
+        </div>
+        <div id="loginLocked" class="alert alert-warning" style="display:none; margin-bottom:15px; text-align:left;">
+          <span class="alert-icon">⚠️</span>
+          <div>Compte bloqué après 5 tentatives. Réessayez dans <strong id="lockCountdown">60</strong>s.
+            <br><button onclick="resetLoginBlock()" style="margin-top:6px; background:#D4A017; border:none; color:#002551; padding:4px 12px; border-radius:4px; cursor:pointer; font-weight:600; font-size:12px;">🔓 Débloquer maintenant</button>
+          </div>
+        </div>
+        <form onsubmit="loginAdmin(event)" id="loginForm">
+          <div class="form-group">
+            <label for="adminLogin">Identifiant</label>
+            <input type="text" id="adminLogin" placeholder="Ex: drh.onhym" autocomplete="username" required>
+          </div>
           <div class="form-group">
             <label for="adminPassword">Mot de passe</label>
-            <input type="password" id="adminPassword" required>
+            <div style="position:relative;">
+              <input type="password" id="adminPassword" autocomplete="current-password" required style="padding-right:44px;">
+              <button type="button" onclick="togglePwdVisibility()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1em;" title="Afficher/Masquer">👁</button>
+            </div>
           </div>
-          <button type="submit" class="btn btn-secondary" style="width:100%;">Se connecter</button>
+          <button type="submit" class="btn btn-secondary" style="width:100%;" id="loginBtn">Se connecter</button>
         </form>
         <p style="margin-top:15px; font-size:0.85em; color:var(--gray-600);">
           Contactez la DRH pour obtenir vos identifiants
@@ -1280,6 +1340,22 @@ footer {
           <div class="kpi-card warning"><div class="value" id="kpiReclam">--</div><div class="label">Réclamations</div></div>
         </div>
 
+        <!-- Barre actions dashboard -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+          <div style="font-size:0.9em; color:var(--gray-600);">
+            Connecté en tant que : <strong id="currentUserDisplay" style="color:var(--primary);"></strong>
+            &nbsp;|&nbsp; Rôle : <span id="currentRoleDisplay" style="font-weight:600;"></span>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="showAdminPanel('candidats')" id="btn-panel-candidats">📋 Candidats</button>
+            <button class="btn btn-ghost" onclick="showAdminPanel('postes')" id="btn-panel-postes">📝 Offres de postes</button>
+            <button class="btn btn-ghost" onclick="showAdminPanel('comptes')" id="btn-panel-comptes">👥 Comptes</button>
+            <button class="btn btn-ghost" onclick="logoutAdmin()">🚪 Déconnexion</button>
+          </div>
+        </div>
+
+        <!-- Panel : Liste des candidats -->
+        <div id="adminPanel-candidats">
         <!-- Table candidats -->
         <div class="table-wrapper">
           <div class="table-header">
@@ -1287,7 +1363,6 @@ footer {
             <div class="search-box">
               <input type="text" id="searchAdmin" placeholder="🔍 Rechercher..." oninput="filterAdminTable()">
               <button class="btn btn-primary" onclick="exportCSV()">⬇ Export CSV</button>
-              <button class="btn btn-ghost" onclick="logoutAdmin()">Déconnexion</button>
             </div>
           </div>
           <div class="table-scroll">
@@ -1309,6 +1384,194 @@ footer {
             </table>
           </div>
         </div>
+
+        </div><!-- fin adminPanel-candidats -->
+
+        <!-- Panel : Gestion des comptes admin -->
+        <div id="adminPanel-comptes" style="display:none;">
+          <div class="table-wrapper">
+            <div class="table-header" style="background:var(--primary-dark);">
+              <h3>👥 Gestion des comptes administrateurs</h3>
+              <button class="btn btn-primary" onclick="showAddAccountModal()">+ Ajouter un compte</button>
+            </div>
+            <div class="table-scroll">
+              <table id="accountsTable">
+                <thead>
+                  <tr>
+                    <th>Identifiant</th>
+                    <th>Nom complet</th>
+                    <th>Rôle</th>
+                    <th>Dernière connexion</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="accountsTableBody">
+                  <tr><td colspan="6" style="text-align:center; padding:20px;">Chargement...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Formulaire ajout/édition compte -->
+          <div id="accountModal" style="display:none; margin-top:25px;">
+            <div class="form-wrapper" style="max-width:600px;">
+              <h3 style="color:var(--primary); margin-bottom:20px;" id="accountModalTitle">➕ Ajouter un compte</h3>
+              <div class="alert alert-warning" style="margin-bottom:20px;">
+                <span class="alert-icon">⚠️</span>
+                <div>Les mots de passe sont stockés en local (localStorage). Pour une sécurité maximale, utilisez un serveur backend.</div>
+              </div>
+              <form onsubmit="saveAccount(event)" id="accountForm">
+                <input type="hidden" id="accountEditId">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                  <div class="form-group">
+                    <label>Identifiant *</label>
+                    <input type="text" id="accLogin" placeholder="Ex: drh.onhym" required>
+                  </div>
+                  <div class="form-group">
+                    <label>Nom complet *</label>
+                    <input type="text" id="accName" placeholder="Ex: Direction RH" required>
+                  </div>
+                  <div class="form-group">
+                    <label>Mot de passe *</label>
+                    <div style="position:relative;">
+                      <input type="password" id="accPassword" placeholder="Min. 8 caractères">
+                      <button type="button" onclick="togglePwdVisibility('accPassword')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;">👁</button>
+                    </div>
+                    <small style="color:var(--gray-600);">Laisser vide pour ne pas modifier (en édition)</small>
+                  </div>
+                  <div class="form-group">
+                    <label>Rôle *</label>
+                    <select id="accRole">
+                      <option value="admin">Admin complet</option>
+                      <option value="lecture">Lecture seule</option>
+                      <option value="drh">DRH</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                  <button type="submit" class="btn btn-secondary">💾 Enregistrer</button>
+                  <button type="button" class="btn btn-ghost" onclick="hideAccountModal()">Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div><!-- fin adminPanel-comptes -->
+
+        <!-- ========== PANEL ÉDITEUR DE POSTES ========== -->
+        <div id="adminPanel-postes" style="display:none;">
+
+          <!-- Barre outils éditeur -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0; color:var(--primary);">📝 Gestion des offres de postes</h3>
+              <p style="margin:4px 0 0; font-size:0.85em; color:var(--gray-600);">Ajoutez, modifiez ou supprimez les offres. Les modifications sont sauvegardées localement.</p>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="showPosteForm()">➕ Nouveau poste</button>
+              <button class="btn btn-ghost" onclick="exportPostesCSV()">⬇ Export CSV</button>
+              <button class="btn btn-ghost" onclick="importPostesFromDemo()">🔄 Recharger depuis Sheets</button>
+            </div>
+          </div>
+
+          <!-- Stats rapides -->
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px;" id="postesStats"></div>
+
+          <!-- Formulaire ajout/édition poste -->
+          <div id="posteFormPanel" style="display:none; background:var(--color-background-secondary); border-radius:var(--border-radius-lg); padding:1.25rem; margin-bottom:20px; border:1.5px solid var(--primary);">
+            <h4 id="posteFormTitle" style="color:var(--primary); margin:0 0 16px;">➕ Nouveau poste</h4>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div class="form-group">
+                <label>ID Poste *</label>
+                <input type="text" id="pf_id" placeholder="Ex: ONH-2026-31">
+              </div>
+              <div class="form-group">
+                <label>Titre du poste *</label>
+                <input type="text" id="pf_titre" placeholder="Ex: Ingénieur Géologue">
+              </div>
+              <div class="form-group">
+                <label>Catégorie *</label>
+                <select id="pf_categorie">
+                  <option value="cadre">Cadre (BAC+5)</option>
+                  <option value="maitrise">Maîtrise (BAC+2)</option>
+                  <option value="classe">Classé (BAC)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Niveau requis *</label>
+                <input type="text" id="pf_niveau" placeholder="Ex: BAC+5">
+              </div>
+              <div class="form-group">
+                <label>Spécialité *</label>
+                <input type="text" id="pf_specialite" placeholder="Ex: Géologie pétrolière">
+              </div>
+              <div class="form-group">
+                <label>Département *</label>
+                <input type="text" id="pf_departement" placeholder="Ex: Exploration">
+              </div>
+              <div class="form-group">
+                <label>Lieu d'affectation</label>
+                <input type="text" id="pf_lieu" placeholder="Ex: Rabat">
+              </div>
+              <div class="form-group">
+                <label>Nombre de postes *</label>
+                <input type="number" id="pf_nb_postes" placeholder="Ex: 2" min="1">
+              </div>
+              <div class="form-group">
+                <label>Date de publication</label>
+                <input type="date" id="pf_date_publication">
+              </div>
+              <div class="form-group">
+                <label>Date limite candidature *</label>
+                <input type="date" id="pf_date_limite">
+              </div>
+              <div class="form-group">
+                <label>Expérience (années)</label>
+                <input type="number" id="pf_experience" placeholder="0" min="0">
+              </div>
+              <div class="form-group">
+                <label>Statut</label>
+                <select id="pf_statut">
+                  <option value="Ouvert">Ouvert</option>
+                  <option value="Cloture">Clôturé</option>
+                  <option value="Brouillon">Brouillon</option>
+                  <option value="Annulé">Annulé</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label>Description du poste</label>
+              <textarea id="pf_description" rows="3" style="width:100%; padding:8px; border:1px solid var(--gray-300); border-radius:6px; font-family:inherit; resize:vertical;" placeholder="Missions et responsabilités..."></textarea>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:14px;">
+              <button class="btn btn-secondary" onclick="savePoste()">💾 Enregistrer</button>
+              <button class="btn btn-ghost" onclick="hidePosteForm()">Annuler</button>
+            </div>
+          </div>
+
+          <!-- Tableau des postes -->
+          <div class="table-wrapper">
+            <div class="table-scroll">
+              <table id="postesTable" style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead>
+                  <tr>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:left;">ID</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:left;">Titre</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Catégorie</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Niveau</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:left;">Lieu</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Postes</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Date limite</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Statut</th>
+                    <th style="background:var(--primary); color:#fff; padding:10px 8px; text-align:center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="postesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div><!-- fin adminPanel-postes -->
+
       </div>
     </div>
   </section>
@@ -1484,7 +1747,18 @@ function switchLang(lang) {
 /* -----------------------------------------------------------
    NAVIGATION ENTRE PAGES
    ----------------------------------------------------------- */
+function isLoggedIn() {
+  try { return !!sessionStorage.getItem('onhym_admin_session'); }
+  catch(e) { return false; }
+}
+
 function showPage(pageId) {
+  // Bloquer l'accès aux pages si non connecté (sauf admin)
+  var logged = false;
+  try { logged = !!sessionStorage.getItem('onhym_admin_session'); } catch(ex) {}
+  if (!logged && pageId !== 'admin') {
+    return;
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + pageId).classList.add('active');
   document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
@@ -1517,37 +1791,154 @@ function showTab(tabId, btn) {
    PARSER CSV SIMPLE (Google Sheets publié en CSV)
    ----------------------------------------------------------- */
 function parseCSV(text) {
-  const rows = [];
-  let current = [''], inQuote = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i], n = text[i+1];
-    if (c === '"' && inQuote && n === '"') { current[current.length-1] += '"'; i++; }
-    else if (c === '"') { inQuote = !inQuote; }
-    else if (c === ',' && !inQuote) { current.push(''); }
-    else if ((c === '\n' || c === '\r') && !inQuote) {
-      if (c === '\r' && n === '\n') i++;
-      rows.push(current); current = [''];
+  // Nettoyage BOM UTF-8
+  text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  function parseLine(line) {
+    const result = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else cur += c;
     }
-    else { current[current.length-1] += c; }
+    result.push(cur.trim());
+    return result;
   }
-  if (current.length > 1 || current[0] !== '') rows.push(current);
-  if (rows.length < 1) return [];
-  const headers = rows[0].map(h => h.trim());
-  return rows.slice(1).map(r => {
+
+  const lines = text.split('\n').filter(l => l.trim());
+  if (lines.length < 2) { console.warn('parseCSV: moins de 2 lignes'); return null; }
+
+  const headers = parseLine(lines[0]).map(h =>
+    h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+     .replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')
+  );
+  console.log('parseCSV OK — colonnes:', headers.length, headers.join(', '));
+
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parseLine(lines[i]);
+    if (cells.every(c => !c)) continue;
     const obj = {};
-    headers.forEach((h, i) => obj[h] = (r[i] || '').trim());
-    return obj;
-  });
+    headers.forEach((h, j) => { obj[h] = cells[j] || ''; });
+    result.push(obj);
+  }
+  console.log('parseCSV — postes lus:', result.length);
+  return result.length ? result : null;
 }
 
 async function fetchCSV(url) {
+  // Essai 1 : URL CSV directe
+  var result = await tryFetch(url);
+  if (result && result.length > 0) return result;
+
+  // Essai 2 : URL HTML alternative si configurée
+  if (CONFIG.SHEET_OFFRES_HTML) {
+    console.log('Essai URL HTML alternative...');
+    result = await tryFetch(CONFIG.SHEET_OFFRES_HTML);
+    if (result && result.length > 0) return result;
+  }
+
+  return null;
+}
+
+async function tryFetch(url) {
   try {
-    const res = await fetch(url);
+    var urlWithCache = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+    var res = await fetch(urlWithCache, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
+    var text = await res.text();
+    var trimmed = text.trim();
+    console.log('Réponse reçue, taille:', text.length, 'chars, début:', trimmed.substring(0,50));
+    if (trimmed.startsWith('<!') || trimmed.startsWith('<html') || url.includes('pubhtml')) {
+      console.log('Format : HTML pubhtml');
+      return parseSheetHTML(text);
+    }
+    if (trimmed.includes(',') && !trimmed.startsWith('<')) {
+      console.log('Format : CSV');
+      return parseCSV(text);
+    }
     return parseCSV(text);
+  } catch(e) {
+    console.warn('tryFetch échoué pour', url, ':', e.message);
+    return null;
+  }
+}
+
+// Parser universel pour le format "Page Web" (pubhtml) de Google Sheets
+function parseSheetHTML(html) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // Google Sheets pubhtml structure : tbody > tr > td avec class "s0", "s1"...
+    // Chercher tous les tableaux et prendre le plus grand
+    const tables = doc.querySelectorAll('table');
+    if (!tables.length) { console.warn('parseSheetHTML: aucun tableau trouvé'); return null; }
+    
+    let mainTable = tables[0];
+    tables.forEach(t => { if (t.rows.length > mainTable.rows.length) mainTable = t; });
+    
+    // Chercher aussi dans les tbody
+    const allRows = mainTable.querySelectorAll('tr');
+    if (allRows.length < 2) { console.warn('parseSheetHTML: moins de 2 lignes'); return null; }
+    
+    // Chercher la ligne d'en-tête : celle qui contient "id" ou "titre"
+    let headerRowIdx = 0;
+    for (let i = 0; i < Math.min(5, allRows.length); i++) {
+      const cells = Array.from(allRows[i].querySelectorAll('td,th')).map(td => td.textContent.trim().toLowerCase());
+      if (cells.includes('id') || cells.includes('titre') || cells.includes('title')) {
+        headerRowIdx = i;
+        break;
+      }
+    }
+    
+    const headers = Array.from(allRows[headerRowIdx].querySelectorAll('td,th')).map(td =>
+      td.textContent.trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '') // retirer accents
+        .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+    );
+    
+    console.log('parseSheetHTML — en-têtes détectés :', headers);
+    
+    const result = [];
+    for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+      const cells = Array.from(allRows[i].querySelectorAll('td,th')).map(td => td.textContent.trim());
+      if (cells.every(c => !c) || cells.length === 0) continue;
+      if (cells[0] === '' && cells.length < 3) continue; // ligne vide
+      const obj = {};
+      headers.forEach((h, j) => { obj[h] = cells[j] || ''; });
+      // Mapper les noms de colonnes alternatifs
+      if (!obj.id && obj.id_) obj.id = obj.id_;
+      if (!obj.titre && obj.title) obj.titre = obj.title;
+      if (!obj.categorie && obj.category) obj.categorie = obj.category;
+      // Normaliser la categorie
+      if (obj.categorie) obj.categorie = obj.categorie.toLowerCase()
+        .replace(/ingenieur|cadre|^cadres?$/i, 'cadre')
+        .replace(/maitrise|technicien|bac\+2/i, 'maitrise')
+        .replace(/classe|agent|bac$/i, 'classe');
+
+      // Colonnes optionnelles — valeurs par défaut si absentes du Sheets
+      if (!obj.visible)           obj.visible = 'TRUE';
+      if (!obj.lieu)              obj.lieu = '';
+      if (!obj.experience)        obj.experience = '';
+      if (!obj.age_max)           obj.age_max = '';
+      if (!obj.date_publiee)      obj.date_publiee = obj.date_publication || '';
+      if (!obj.nb_candidatures)   obj.nb_candidatures = '0';
+      if (!obj.taux_remplissage)  obj.taux_remplissage = '0';
+
+      // Filtrer : n'afficher que les postes visibles et au statut Ouvert
+      const statutOk = !obj.statut || ['ouvert','open',''].includes(obj.statut.toLowerCase());
+      const visibleOk = !obj.visible || obj.visible.toString().toUpperCase() !== 'FALSE';
+      if (statutOk && visibleOk) result.push(obj);
+    }
+    console.log('Google Sheets pubhtml parse :', result.length, 'lignes | colonnes :', headers.join(', '));
+    return result.length ? result : null;
   } catch (e) {
-    console.warn('Erreur CSV:', e);
+    console.warn('Erreur parsing pubhtml:', e);
     return null;
   }
 }
@@ -1565,22 +1956,568 @@ async function fetchCSV(url) {
    ----------------------------------------------------------- */
 
 // Données de démonstration (utilisées si Google Sheets non configuré)
+// OFFRES_DEMO : 30 postes de secours si Google Sheets non disponible
+// Source principale : CONFIG.SHEET_OFFRES_CSV (Google Sheets ONHYM_Offres)
+// Répartition : 11 Cadres | 9 Maîtrises | 10 Classés
 const OFFRES_DEMO = [
-  { id:'ONH-2026-01', titre:'Ingénieur Géologue Senior', categorie:'cadre', niveau:'BAC+5', specialite:'Géologie pétrolière', departement:'Exploration', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'2', description:'Analyse de bassins sédimentaires et prospection pétrolière.', statut:'Ouvert' },
-  { id:'ONH-2026-02', titre:'Ingénieur Géophysicien', categorie:'cadre', niveau:'BAC+5', specialite:'Géophysique', departement:'Exploration', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'2', description:'Interprétation sismique 2D/3D.', statut:'Ouvert' },
-  { id:'ONH-2026-03', titre:'Ingénieur Réservoir', categorie:'cadre', niveau:'BAC+5', specialite:'Ingénierie pétrolière', departement:'Production', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'1', description:'Modélisation et gestion de gisements.', statut:'Ouvert' },
-  { id:'ONH-2026-04', titre:'Ingénieur Forage', categorie:'cadre', niveau:'BAC+5', specialite:'Forage & Puits', departement:'Opérations', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'1', description:'Supervision des opérations de forage.', statut:'Ouvert' },
-  { id:'ONH-2026-05', titre:'Ingénieur Mines', categorie:'cadre', niveau:'BAC+5', specialite:'Ingénierie minière', departement:'Mines', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'2', description:'Exploitation et valorisation de gisements miniers.', statut:'Ouvert' },
-  { id:'ONH-2026-06', titre:'Ingénieur HSE', categorie:'cadre', niveau:'BAC+5', specialite:'Hygiène-Sécurité-Environnement', departement:'QHSE', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'1', description:'Management HSE sur sites opérationnels.', statut:'Ouvert' },
-  { id:'ONH-2026-07', titre:'Cadre Financier', categorie:'cadre', niveau:'BAC+5', specialite:'Finance / Contrôle de gestion', departement:'DAF', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'1', description:'Pilotage budgétaire et reporting.', statut:'Ouvert' },
-  { id:'ONH-2026-08', titre:'Cadre Juridique', categorie:'cadre', niveau:'BAC+5', specialite:'Droit des affaires', departement:'Juridique', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'1', description:'Contrats pétroliers et miniers.', statut:'Ouvert' },
-  { id:'ONH-2026-09', titre:'Technicien Géologue', categorie:'maitrise', niveau:'BAC+2', specialite:'Géologie', departement:'Exploration', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'3', description:'Échantillonnage et cartographie.', statut:'Ouvert' },
-  { id:'ONH-2026-10', titre:'Technicien Géophysique', categorie:'maitrise', niveau:'BAC+2', specialite:'Géophysique', departement:'Exploration', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'2', description:'Acquisition de données sismiques.', statut:'Ouvert' },
-  { id:'ONH-2026-11', titre:'Technicien Laboratoire', categorie:'maitrise', niveau:'BAC+2', specialite:'Chimie analytique', departement:'Laboratoire', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'2', description:'Analyses géochimiques.', statut:'Ouvert' },
-  { id:'ONH-2026-12', titre:'Technicien Maintenance', categorie:'maitrise', niveau:'BAC+2', specialite:'Électromécanique', departement:'Maintenance', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'2', description:'Maintenance préventive et corrective.', statut:'Ouvert' },
-  { id:'ONH-2026-13', titre:'Agent Administratif', categorie:'classe', niveau:'BAC', specialite:'Administration', departement:'Services généraux', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'4', description:'Gestion administrative et secrétariat.', statut:'Ouvert' },
-  { id:'ONH-2026-14', titre:'Agent Logistique', categorie:'classe', niveau:'BAC', specialite:'Logistique', departement:'Achats', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'3', description:'Gestion des stocks et approvisionnements.', statut:'Ouvert' },
-  { id:'ONH-2026-15', titre:'Agent de Sécurité', categorie:'classe', niveau:'BAC', specialite:'Sécurité', departement:'Sécurité', date_publication:'2026-04-15', date_limite:'2026-05-15', nb_postes:'3', description:'Surveillance des sites ONHYM.', statut:'Ouvert' }
+  {
+    "id": "ONH-2026-01",
+    "titre": "Ingénieur Géologue Senior",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Géologie pétrolière",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Analyse de bassins sédimentaires, interprétation des données de terrain, prospection pétrolière et minière.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-02",
+    "titre": "Ingénieur Géophysicien",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Géophysique",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Interprétation sismique 2D/3D, traitement de données géophysiques, modélisation subsurface.",
+    "experience": "2",
+    "age_max": "38",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-03",
+    "titre": "Ingénieur Réservoir",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Ingénierie pétrolière",
+    "departement": "Production",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Modélisation et simulation de gisements, gestion optimisée de la production pétrolière et gazière.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-04",
+    "titre": "Ingénieur Forage",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Forage & Complétion de puits",
+    "departement": "Opérations",
+    "lieu": "Agadir",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Supervision des opérations de forage, conception des programmes de forage, contrôle technique sur site.",
+    "experience": "4",
+    "age_max": "42",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-05",
+    "titre": "Ingénieur Mines",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Ingénierie minière",
+    "departement": "Mines",
+    "lieu": "Ouarzazate",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Exploitation et valorisation de gisements miniers, études de faisabilité, suivi des travaux miniers.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-06",
+    "titre": "Ingénieur Géochimiste",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Géochimie organique",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Analyses géochimiques des roches mères et des fluides, évaluation du potentiel pétrolier des bassins.",
+    "experience": "2",
+    "age_max": "38",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-07",
+    "titre": "Ingénieur HSE",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Hygiène-Sécurité-Environnement",
+    "departement": "QHSE",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Management du système HSE sur sites opérationnels, audits, plans d'urgence et formations sécurité.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-08",
+    "titre": "Cadre Financier",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Finance / Contrôle de gestion",
+    "departement": "DAF",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Pilotage budgétaire, reporting financier, analyse de performance et optimisation des coûts opérationnels.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-09",
+    "titre": "Cadre Juridique",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Droit des affaires / Droit minier",
+    "departement": "Juridique",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Rédaction et négociation de contrats pétroliers et miniers, veille juridique, contentieux.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-10",
+    "titre": "Ingénieur Systèmes d'Information",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Informatique / SI",
+    "departement": "DSI",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Administration des systèmes d'information, projets de transformation numérique, cybersécurité.",
+    "experience": "2",
+    "age_max": "38",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-11",
+    "titre": "Cadre RH & Développement",
+    "categorie": "cadre",
+    "niveau": "BAC+5",
+    "specialite": "Ressources humaines",
+    "departement": "DRH",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Gestion du développement RH, plans de formation, évaluation des compétences et GPEC.",
+    "experience": "3",
+    "age_max": "40",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-12",
+    "titre": "Technicien Géologue",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Géologie",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Échantillonnage de carottes, cartographie géologique, gestion des bases de données terrain.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-13",
+    "titre": "Technicien Géophysique",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Géophysique appliquée",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Acquisition et traitement de données sismiques, maintenance des équipements de terrain.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-14",
+    "titre": "Technicien Laboratoire Géochimie",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Chimie analytique",
+    "departement": "Laboratoire",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Analyses géochimiques de roches et de fluides, gestion des équipements analytiques.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-15",
+    "titre": "Technicien Électromécanique",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Électromécanique / Maintenance",
+    "departement": "Maintenance",
+    "lieu": "Agadir",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Maintenance préventive et corrective des équipements de forage et de surface.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16",
+    "titre": "Technicien Topographe",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Topographie / SIG",
+    "departement": "Exploration",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Levés topographiques, gestion des SIG, cartographie numérique.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16B",
+    "titre": "Technicien Informatique",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Informatique / Réseaux",
+    "departement": "DSI",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Support technique, administration des postes de travail et réseaux informatiques.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16C",
+    "titre": "Technicien Dessinateur",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Dessin industriel / DAO",
+    "departement": "Opérations",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Réalisation de plans et schémas techniques, gestion de la bibliothèque de dessins.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16D",
+    "titre": "Technicien HSE Terrain",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Hygiène-Sécurité-Environnement",
+    "departement": "QHSE",
+    "lieu": "Agadir",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Application des procédures HSE sur site, contrôle des EPI, rapports de sécurité.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-16E",
+    "titre": "Technicien Comptable",
+    "categorie": "maitrise",
+    "niveau": "BAC+2",
+    "specialite": "Comptabilité / Gestion",
+    "departement": "DAF",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Saisie comptable, rapprochements bancaires, gestion des factures fournisseurs.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-17",
+    "titre": "Agent Administratif",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Administration générale",
+    "departement": "Services généraux",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Gestion administrative, secrétariat, accueil, classement et archivage de documents.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-18",
+    "titre": "Agent de Saisie & Archivage",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Bureautique / Informatique",
+    "departement": "Documentation",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Saisie de données, numérisation et archivage électronique des documents.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-19",
+    "titre": "Agent Logistique",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Logistique / Gestion des stocks",
+    "departement": "Achats",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Réception, stockage et distribution du matériel, gestion des inventaires.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-20",
+    "titre": "Agent de Sécurité",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Sécurité industrielle",
+    "departement": "Sécurité",
+    "lieu": "Agadir",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "2",
+    "description": "Surveillance et contrôle des accès aux sites ONHYM, rondes de sécurité.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-21",
+    "titre": "Chauffeur Véhicule Léger",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Transport / Logistique",
+    "departement": "Services généraux",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Transport du personnel et du matériel, entretien courant des véhicules.",
+    "experience": "1",
+    "age_max": "35",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-22",
+    "titre": "Agent d'Entretien Technique",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Électricité / Plomberie",
+    "departement": "Maintenance",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Entretien courant des locaux et installations techniques.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-23",
+    "titre": "Opérateur de Saisie",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Bureautique",
+    "departement": "Documentation",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Saisie et mise à jour des bases de données documentaires.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-24",
+    "titre": "Agent d'Accueil & Protocole",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Accueil / Communication",
+    "departement": "Services généraux",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Accueil des visiteurs, gestion du standard téléphonique.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-25",
+    "titre": "Magasinier",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Gestion des stocks",
+    "departement": "Achats",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Réception et rangement des marchandises, gestion physique des stocks.",
+    "experience": "",
+    "age_max": "30",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "ONH-2026-26",
+    "titre": "Planton / Coursier Interne",
+    "categorie": "classe",
+    "niveau": "BAC",
+    "specialite": "Services généraux",
+    "departement": "Services généraux",
+    "lieu": "Rabat",
+    "date_publication": "2026-04-15",
+    "date_limite": "2026-05-15",
+    "nb_postes": "1",
+    "description": "Distribution du courrier interne, liaisons inter-services.",
+    "experience": "",
+    "age_max": "28",
+    "date_publiee": "2026-04-15",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  },
+  {
+    "id": "TOTAL",
+    "titre": "",
+    "categorie": "",
+    "niveau": "",
+    "specialite": "",
+    "departement": "",
+    "lieu": "",
+    "date_publication": "",
+    "date_limite": "",
+    "nb_postes": "=SUM(J4:J33)",
+    "description": "",
+    "experience": "",
+    "age_max": "",
+    "date_publiee": "",
+    "statut": "Ouvert",
+    "visible": "TRUE"
+  }
 ];
 
 let _allOffres = [];
@@ -1589,24 +2526,74 @@ async function loadOffres() {
   const container = document.getElementById('offersContainer');
   container.innerHTML = '<div class="loader"><div class="spinner"></div><p>Chargement des avis de concours...</p></div>';
 
-  // Tentative de chargement depuis Google Sheets
   let data = null;
+  let source = 'demo';
+
+  // Tentative 1 : CSV depuis Google Sheets (fonctionne uniquement si hébergé sur serveur)
+  // En mode fichier local (file://), le fetch est bloqué par CORS → fallback OFFRES_DEMO
   if (CONFIG.SHEET_OFFRES_CSV && !CONFIG.SHEET_OFFRES_CSV.includes('REMPLACER_ID')) {
-    data = await fetchCSV(CONFIG.SHEET_OFFRES_CSV);
+    try {
+      data = await fetchCSV(CONFIG.SHEET_OFFRES_CSV);
+      if (data && data.length > 0) {
+        data = data.map(o => {
+          if (o.categorie) o.categorie = o.categorie.trim().toLowerCase()
+            .replace(/cadre|ingenieur|ing\./, 'cadre')
+            .replace(/maitrise|technicien|tech\./, 'maitrise')
+            .replace(/class|agent/, 'classe');
+          if (!o.visible || o.visible === '') o.visible = 'TRUE';
+          if (!o.statut  || o.statut  === '') o.statut  = 'Ouvert';
+          return o;
+        }).filter(o =>
+          o.visible.toUpperCase() !== 'FALSE' &&
+          ['ouvert','open',''].includes(o.statut.toLowerCase())
+        );
+        source = data.length > 0 ? 'sheets' : 'demo';
+      }
+    } catch(e) {
+      console.warn('Fetch Google Sheets échoué (CORS en local ?):', e.message);
+    }
   }
 
-  // Fallback : données de démonstration
+  // Fallback : données depuis localStorage (modifiables via admin) ou OFFRES_DEMO
   if (!data || data.length === 0) {
-    data = OFFRES_DEMO;
-    container.innerHTML = '<div class="alert alert-warning"><span class="alert-icon">⚠️</span><div><strong>Mode démonstration :</strong> Les offres ci-dessous sont des exemples. Configurez <code>CONFIG.SHEET_OFFRES_CSV</code> pour charger vos propres données depuis Google Sheets.</div></div><div id="offersInner"></div>';
-    _allOffres = data;
-    renderOffres(_allOffres, 'offersInner');
-  } else {
-    _allOffres = data;
-    container.innerHTML = '<div id="offersInner"></div>';
-    renderOffres(_allOffres, 'offersInner');
+    try {
+      const stored = localStorage.getItem(POSTES_KEY);
+      data = stored ? JSON.parse(stored) : OFFRES_DEMO;
+    } catch(e) { data = OFFRES_DEMO; }
+    source = 'integre';
   }
+
+  _allOffres = data;
+
+  if (source === 'demo') {
+    container.innerHTML = `<div class="alert alert-warning">
+      <span class="alert-icon">⚠️</span>
+      <div>
+        <strong>Mode démonstration :</strong> Données types affichées. 
+        Google Sheets non accessible ou données non reconnues.<br>
+        <small style="color:var(--gray-600);">
+          Vérifiez la console du navigateur (F12 → Console) pour le détail.
+          <br>Lien configuré : <code style="font-size:10px;">${CONFIG.SHEET_OFFRES_CSV.substring(0,60)}...</code>
+        </small>
+        <br><button class="btn btn-ghost" style="margin-top:8px;padding:4px 12px;font-size:0.82em;" 
+          onclick="reloadOffres()">🔄 Réessayer la connexion Google Sheets</button>
+      </div>
+    </div><div id="offersInner"></div>`;
+  } else {
+    container.innerHTML = `<div class="alert alert-success" style="margin-bottom:12px;">
+      <span class="alert-icon">✅</span>
+      <div><strong>Données chargées depuis Google Sheets ONHYM_Offres</strong>
+        <br><small style="color:var(--gray-600);">Mis à jour le ${new Date().toLocaleString('fr-FR')}</small>
+      </div>
+    </div><div id="offersInner"></div>`;
+  }
+
+  renderOffres(_allOffres, 'offersInner');
+  updateFilterCounts();
   window._offresLoaded = true;
+  // Afficher l'heure de dernière mise à jour
+  const elUpdate = document.getElementById('offresLastUpdate');
+  if (elUpdate) elUpdate.textContent = 'Dernière mise à jour : ' + new Date().toLocaleTimeString('fr-FR');
 }
 
 function renderOffres(offres, containerId) {
@@ -1638,7 +2625,9 @@ function renderOfferCard(o) {
         <div class="offer-info"><strong>🎓 Niveau</strong><span>${escapeHtml(o.niveau)}</span></div>
         <div class="offer-info"><strong>🔬 Spécialité</strong><span>${escapeHtml(o.specialite)}</span></div>
         <div class="offer-info"><strong>🏢 Département</strong><span>${escapeHtml(o.departement)}</span></div>
+        ${o.lieu ? `<div class="offer-info"><strong>📍 Lieu</strong><span>${escapeHtml(o.lieu)}</span></div>` : ''}
         <div class="offer-info"><strong>👥 Postes</strong><span>${escapeHtml(o.nb_postes)}</span></div>
+        ${o.experience ? `<div class="offer-info"><strong>⏱ Expérience</strong><span>${escapeHtml(o.experience)} an(s) min.</span></div>` : ''}
         <div class="offer-info"><strong>📅 Date limite</strong><span>${formatDate(o.date_limite)}</span></div>
         ${o.description ? `<p style="margin-top:12px; font-size:0.9em; color:var(--gray-600); line-height:1.5;">${escapeHtml(o.description)}</p>` : ''}
       </div>
@@ -1664,6 +2653,33 @@ function filterOffers(cat, btn) {
   const filtered = cat === 'all' ? _allOffres : _allOffres.filter(o => o.categorie === cat);
   const target = document.getElementById('offersInner') ? 'offersInner' : 'offersContainer';
   renderOffres(filtered, target);
+}
+
+function reloadOffres() {
+  // Forcer le rechargement depuis Google Sheets (vide le cache local)
+  window._offresLoaded = false;
+  _allOffres = [];
+  document.getElementById('offersContainer').innerHTML = '<div class="loader"><div class="spinner"></div><p>Actualisation depuis Google Sheets...</p></div>';
+  loadOffres().then(() => {
+    const el = document.getElementById('offresLastUpdate');
+    if (el) el.textContent = 'Dernière mise à jour : ' + new Date().toLocaleTimeString('fr-FR');
+  });
+}
+
+function updateFilterCounts() {
+  if (!_allOffres.length) return;
+  const total = _allOffres.length;
+  const cadre = _allOffres.filter(o => o.categorie === 'cadre').length;
+  const maitrise = _allOffres.filter(o => o.categorie === 'maitrise').length;
+  const classe = _allOffres.filter(o => o.categorie === 'classe').length;
+  const fa = document.getElementById('filter-all');
+  const fc = document.getElementById('filter-cadre');
+  const fm = document.getElementById('filter-maitrise');
+  const fl = document.getElementById('filter-classe');
+  if (fa) fa.textContent = `Tous (${total})`;
+  if (fc) fc.textContent = `🎓 Ingénieurs & Cadres (${cadre})`;
+  if (fm) fm.textContent = `📘 Maîtrises BAC+2 (${maitrise})`;
+  if (fl) fl.textContent = `📗 Classés BAC (${classe})`;
 }
 
 /* Utilitaires */
@@ -1716,15 +2732,27 @@ function loadFormCandidature() {
   injectCandidatureBanner(code, offre);
 
   if (CONFIG.FORM_CANDIDATURE && !CONFIG.FORM_CANDIDATURE.includes('REMPLACER_ID')) {
-    // Pré-remplir les champs via l'URL Google Forms si configuré
     let url = CONFIG.FORM_CANDIDATURE;
+    // Pré-remplissage des champs si IDs configurés (entry.XXXXXXX)
     if (CONFIG.FORM_PREFILL_CODE_ENTRY) {
-      const sep = url.includes('?') ? '&' : '?';
-      url += `${sep}${CONFIG.FORM_PREFILL_CODE_ENTRY}=${encodeURIComponent(code)}`;
-      if (CONFIG.FORM_PREFILL_OFFRE_ENTRY && offre) {
-        url += `&${CONFIG.FORM_PREFILL_OFFRE_ENTRY}=${encodeURIComponent(offre)}`;
-      }
+      url += '&' + CONFIG.FORM_PREFILL_CODE_ENTRY + '=' + encodeURIComponent(code);
     }
+    if (CONFIG.FORM_PREFILL_OFFRE_ENTRY && offre) {
+      url += '&' + CONFIG.FORM_PREFILL_OFFRE_ENTRY + '=' + encodeURIComponent(offre);
+    }
+    // Détection d'erreur iframe : si Google renvoie une page d'erreur, basculer vers bouton
+    iframe.onload = function() {
+      try {
+        // Tenter d'accéder au titre de la page chargée (échoue si cross-origin, OK si erreur Google Drive)
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        const bodyText = iframeDoc.body ? iframeDoc.body.innerText : '';
+        if (bodyText.includes("n'existe pas") || bodyText.includes("not exist") || bodyText.includes("Drive")) {
+          showFormFallback(url, code);
+        }
+      } catch(e) {
+        // Cross-origin = formulaire Google chargé normalement, pas d'erreur
+      }
+    };
     iframe.src = url;
     iframe.style.display = 'block';
     fallback.style.display = 'none';
@@ -1732,6 +2760,44 @@ function loadFormCandidature() {
     iframe.style.display = 'none';
     fallback.style.display = 'flex';
   }
+}
+
+// Résout un lien court Google Forms (forms.gle) ou retourne l'URL telle quelle
+async function resolveFormURL(url) {
+  // Déjà une URL Google Forms complète — retourner directement
+  if (url.includes('docs.google.com/forms')) return url;
+  // Lien court forms.gle — construire l'URL embed via le pattern connu
+  // forms.gle/XXXX redirige vers docs.google.com/forms/d/e/ID/viewform
+  // On charge le lien dans un fetch no-redirect pour récupérer le Location header
+  try {
+    const res = await fetch(url, { method: 'HEAD', redirect: 'manual' });
+    const location = res.headers.get('location') || res.url;
+    if (location && location.includes('google.com/forms')) return location;
+  } catch(e) { /* CORS probable en HEAD */ }
+  // Fallback : embed direct du lien court (marche dans iframe moderne)
+  return url;
+}
+
+function showFormFallback(formUrl, code) {
+  // L'iframe a renvoyé une erreur Google Drive — afficher un bouton lien direct propre
+  const iframe = document.getElementById('formCandidature');
+  const fallback = document.getElementById('formFallback');
+  const viewUrl = formUrl.replace('?embedded=true','').replace('&embedded=true','');
+  iframe.style.display = 'none';
+  fallback.style.display = 'flex';
+  fallback.innerHTML = `
+    <span class="alert-icon">📋</span>
+    <div>
+      <strong>Formulaire "Candidature ONHYM 2026"</strong><br>
+      <small style="color:var(--gray-600);">Votre code candidat : <code style="font-weight:700;">${escapeHtml(code)}</code> — notez-le avant de remplir le formulaire.</small><br><br>
+      <a href="${escapeHtml(viewUrl)}" target="_blank" class="btn btn-primary" style="display:inline-block; margin-top:4px;">
+        ✍️ Ouvrir le formulaire de candidature ↗
+      </a>
+      <p style="margin-top:12px; font-size:0.82em; color:var(--gray-600);">
+        Le formulaire s'ouvre dans un nouvel onglet. Une fois soumis, revenez ici pour suivre votre candidature avec votre code.
+      </p>
+    </div>
+  `;
 }
 
 function injectCandidatureBanner(code, offre) {
@@ -2009,23 +3075,518 @@ function buildResultsTable(list, noteField, isFinal) {
   return html;
 }
 
-// Placeholder : admin (étape 5)
-function loginAdmin(e) {
-  e.preventDefault();
-  const pwd = document.getElementById('adminPassword').value;
-  if (pwd === CONFIG.ADMIN_PASSWORD) {
-    document.getElementById('loginBox').style.display = 'none';
-    document.getElementById('adminDashboard').style.display = 'block';
-    loadAdminData();
-  } else {
-    alert('Mot de passe incorrect');
+/* -----------------------------------------------------------
+   SYSTEME D'AUTHENTIFICATION ADMIN MULTI-COMPTES
+   Stockage : localStorage (clé chiffrée base64)
+   Fonctionnalités : multi-comptes, rôles, blocage tentatives,
+                     gestion des comptes depuis le dashboard
+   ----------------------------------------------------------- */
+
+const AUTH_STORAGE_KEY = 'onhym_admin_accounts';
+const AUTH_SESSION_KEY = 'onhym_admin_session';
+const MAX_ATTEMPTS = 5;
+const LOCK_DURATION = 60; // secondes
+
+// Initialiser les comptes par défaut au premier lancement
+function initDefaultAccounts() {
+  const existing = loadAccounts();
+  if (existing.length === 0) {
+    const defaults = [
+      { id: 'drh-001', login: 'admin', name: 'Administrateur principal', role: 'admin',
+        pwdHash: btoa('ONHYM2026'), active: true, createdAt: new Date().toISOString(), lastLogin: null },
+      { id: 'drh-002', login: 'drh.onhym', name: 'Direction RH', role: 'drh',
+        pwdHash: btoa('DRH@ONHYM2026'), active: true, createdAt: new Date().toISOString(), lastLogin: null }
+    ];
+    saveAccounts(defaults);
   }
 }
 
+function loadAccounts() {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(atob(raw));
+  } catch(e) { return []; }
+}
+
+function saveAccounts(accounts) {
+  localStorage.setItem(AUTH_STORAGE_KEY, btoa(JSON.stringify(accounts)));
+}
+
+function getSession() {
+  try {
+    const raw = sessionStorage.getItem(AUTH_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function setSession(account) {
+  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
+    id: account.id, login: account.login, name: account.name,
+    role: account.role, loginAt: new Date().toISOString()
+  }));
+}
+
+// Gestion du blocage après trop de tentatives
+function getAttempts() {
+  try { return JSON.parse(localStorage.getItem('onhym_login_attempts') || '{"count":0,"lockedUntil":0}'); }
+  catch(e) { return {count:0, lockedUntil:0}; }
+}
+function saveAttempts(data) { localStorage.setItem('onhym_login_attempts', JSON.stringify(data)); }
+function resetAttempts() { localStorage.removeItem('onhym_login_attempts'); }
+
+let _lockTimer = null;
+
+function loginAdmin(e) {
+  e.preventDefault();
+
+  var login = document.getElementById('adminLogin').value.trim();
+  var pwd   = document.getElementById('adminPassword').value.trim();
+  var err   = document.getElementById('loginError');
+  var errMsg= document.getElementById('loginErrorMsg');
+
+  // Identifiants autorisés
+  var ok = (login === 'admin' && pwd === 'ONHYM2026') ||
+           (login === 'drh.onhym' && pwd === 'DRH@ONHYM2026');
+
+  if (!ok) {
+    err.style.display = 'flex';
+    errMsg.textContent = 'Identifiant ou mot de passe incorrect.';
+    document.getElementById('adminPassword').value = '';
+    return;
+  }
+
+  // Connexion réussie
+  err.style.display = 'none';
+
+  // Sauvegarder session
+  try {
+    sessionStorage.setItem('onhym_admin_session', JSON.stringify({
+      login: login,
+      name: login === 'admin' ? 'Administrateur principal' : 'Direction RH',
+      role: login === 'admin' ? 'admin' : 'drh',
+      loginAt: new Date().toISOString()
+    }));
+  } catch(ex) {}
+
+  // Masquer login, afficher dashboard
+  document.getElementById('loginBox').style.display = 'none';
+  var dash = document.getElementById('adminDashboard');
+  dash.style.display = 'block';
+  dash.classList.add('visible');
+
+  // Infos utilisateur dans le dashboard
+  var cu = document.getElementById('currentUserDisplay');
+  var cr = document.getElementById('currentRoleDisplay');
+  if (cu) cu.textContent = (login === 'admin' ? 'Administrateur' : 'Direction RH') + ' (' + login + ')';
+  if (cr) cr.textContent = login === 'admin' ? 'Admin complet' : 'DRH';
+
+  // Afficher panel candidats par défaut
+  showAdminPanel('candidats');
+  loadAdminData();
+
+  // Révéler la navigation
+  var navLinks = document.getElementById('navLinks');
+  var navLocked = document.getElementById('navLockedMsg');
+  if (navLinks) navLinks.style.display = 'contents';
+  if (navLocked) navLocked.style.display = 'none';
+
+  // Aller sur la page d'accueil
+  showPage('accueil');
+}
+
+
+function resetLoginBlock() {
+  localStorage.removeItem('onhym_login_attempts');
+  document.getElementById('loginLocked').style.display = 'none';
+  document.getElementById('loginError').style.display = 'none';
+  if (_lockTimer) clearInterval(_lockTimer);
+}
+
+function startLockCountdown(seconds) {
+  if (_lockTimer) clearInterval(_lockTimer);
+  let s = seconds;
+  document.getElementById('lockCountdown').textContent = s;
+  _lockTimer = setInterval(() => {
+    s--;
+    const el = document.getElementById('lockCountdown');
+    if (el) el.textContent = s;
+    if (s <= 0) {
+      clearInterval(_lockTimer);
+      const lockedBox = document.getElementById('loginLocked');
+      if (lockedBox) lockedBox.style.display = 'none';
+      resetAttempts();
+    }
+  }, 1000);
+}
+
 function logoutAdmin() {
+  sessionStorage.removeItem(AUTH_SESSION_KEY);
   document.getElementById('loginBox').style.display = 'block';
-  document.getElementById('adminDashboard').style.display = 'none';
+  const dash2 = document.getElementById('adminDashboard');
+  dash2.style.display = 'none';
+  dash2.classList.remove('visible');
   document.getElementById('adminPassword').value = '';
+  document.getElementById('adminLogin').value = '';
+  document.getElementById('loginError').style.display = 'none';
+
+  // Masquer les liens de navigation
+  const navLinks2 = document.getElementById('navLinks');
+  const navLocked2 = document.getElementById('navLockedMsg');
+  if (navLinks2) navLinks2.style.display = 'none';
+  if (navLocked2) navLocked2.style.display = 'inline-block';
+}
+
+function togglePwdVisibility(fieldId) {
+  const field = document.getElementById(fieldId || 'adminPassword');
+  if (field) field.type = field.type === 'password' ? 'text' : 'password';
+}
+
+function showAdminPanel(panel) {
+  ['candidats','postes','comptes'].forEach(p => {
+    const el = document.getElementById('adminPanel-' + p);
+    const btn = document.getElementById('btn-panel-' + p);
+    if (el) el.style.display = p === panel ? 'block' : 'none';
+    if (btn) { btn.classList.toggle('btn-secondary', p === panel); btn.classList.toggle('btn-ghost', p !== panel); }
+  });
+  if (panel === 'comptes') renderAccountsTable();
+  if (panel === 'postes')  renderPostesTable();
+}
+
+/* ================================================================
+   ÉDITEUR DE POSTES — Gestion complète depuis l'espace admin
+   Stockage : localStorage (clé onhym_postes)
+   ================================================================ */
+
+const POSTES_KEY = 'onhym_postes_v1';
+
+// Charger les postes depuis localStorage ou OFFRES_DEMO
+function loadPostes() {
+  try {
+    const raw = localStorage.getItem(POSTES_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && data.length > 0) return data;
+    }
+  } catch(e) {}
+  // Initialiser avec les données intégrées
+  localStorage.setItem(POSTES_KEY, JSON.stringify(OFFRES_DEMO));
+  return JSON.parse(JSON.stringify(OFFRES_DEMO));
+}
+
+function savePostes(postes) {
+  localStorage.setItem(POSTES_KEY, JSON.stringify(postes));
+  // Mettre à jour _allOffres pour l'affichage public
+  _allOffres = postes.filter(p => p.visible !== 'FALSE' && ['ouvert','open',''].includes((p.statut||'').toLowerCase()));
+  updateFilterCounts();
+}
+
+// Afficher les stats en haut du panel
+function renderPostesStats(postes) {
+  const el = document.getElementById('postesStats');
+  if (!el) return;
+  const total  = postes.length;
+  const cadre  = postes.filter(p => p.categorie === 'cadre').length;
+  const mait   = postes.filter(p => p.categorie === 'maitrise').length;
+  const classe = postes.filter(p => p.categorie === 'classe').length;
+  const stats  = [
+    { label:'Total postes', val: total,  color:'#002551' },
+    { label:'Cadres',       val: cadre,  color:'#1565C0' },
+    { label:'Maîtrises',    val: mait,   color:'#283593' },
+    { label:'Classés',      val: classe, color:'#1A6B3C' },
+  ];
+  el.innerHTML = stats.map(s => `
+    <div style="background:#fff; border:1.5px solid #E0E7F0; border-radius:10px; padding:12px; text-align:center;">
+      <div style="font-size:26px; font-weight:700; color:${s.color};">${s.val}</div>
+      <div style="font-size:12px; color:#666;">${s.label}</div>
+    </div>`).join('');
+}
+
+// Rendre le tableau des postes
+function renderPostesTable() {
+  const postes = loadPostes();
+  renderPostesStats(postes);
+  const tbody = document.getElementById('postesTableBody');
+  if (!tbody) return;
+  const catColors = { cadre:'#1565C0', maitrise:'#283593', classe:'#1A6B3C' };
+  const catLabels = { cadre:'Cadre', maitrise:'Maîtrise', classe:'Classé' };
+  tbody.innerHTML = postes.map((p, i) => `
+    <tr style="background:${i%2===0?'#fff':'#F8FAFC'}; border-bottom:1px solid #E8EDF5;">
+      <td style="padding:8px; font-weight:600; color:var(--primary); font-size:12px;">${escapeHtml(p.id)}</td>
+      <td style="padding:8px; font-weight:500;">${escapeHtml(p.titre)}</td>
+      <td style="padding:8px; text-align:center;">
+        <span style="background:${catColors[p.categorie]||'#666'}20; color:${catColors[p.categorie]||'#666'}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">
+          ${catLabels[p.categorie] || p.categorie}
+        </span>
+      </td>
+      <td style="padding:8px; text-align:center; font-size:12px;">${escapeHtml(p.niveau||'')}</td>
+      <td style="padding:8px; font-size:12px;">${escapeHtml(p.lieu||'')}</td>
+      <td style="padding:8px; text-align:center; font-weight:700; color:var(--primary);">${escapeHtml(p.nb_postes||'')}</td>
+      <td style="padding:8px; text-align:center; font-size:12px;">${escapeHtml(p.date_limite||'')}</td>
+      <td style="padding:8px; text-align:center;">
+        <span style="background:${p.statut==='Ouvert'?'#E8F5E9':'#FFF3E0'}; color:${p.statut==='Ouvert'?'#2E7D32':'#E65100'}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">
+          ${escapeHtml(p.statut||'Ouvert')}
+        </span>
+      </td>
+      <td style="padding:8px; text-align:center;">
+        <button onclick="editPoste('${escapeHtml(p.id)}')" style="background:var(--primary); color:#fff; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px; margin-right:4px;">✏️</button>
+        <button onclick="togglePosteStatut('${escapeHtml(p.id)}')" style="background:#F0AD00; color:#fff; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px; margin-right:4px;" title="${p.statut==='Ouvert'?'Clôturer':'Ouvrir'}">${p.statut==='Ouvert'?'🔒':'🔓'}</button>
+        <button onclick="deletePoste('${escapeHtml(p.id)}')" style="background:#C62828; color:#fff; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px;">🗑</button>
+      </td>
+    </tr>`).join('');
+}
+
+// Afficher le formulaire vide (nouveau poste)
+function showPosteForm() {
+  const postes = loadPostes();
+  const lastId = postes.length > 0 ? postes[postes.length-1].id : 'ONH-2026-00';
+  const num    = parseInt(lastId.split('-')[2] || 0) + 1;
+  const year   = new Date().getFullYear();
+  document.getElementById('pf_id').value           = `ONH-${year}-${String(num).padStart(2,'0')}`;
+  document.getElementById('pf_titre').value         = '';
+  document.getElementById('pf_categorie').value     = 'cadre';
+  document.getElementById('pf_niveau').value        = '';
+  document.getElementById('pf_specialite').value    = '';
+  document.getElementById('pf_departement').value   = '';
+  document.getElementById('pf_lieu').value          = 'Rabat';
+  document.getElementById('pf_nb_postes').value     = '1';
+  document.getElementById('pf_date_publication').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pf_date_limite').value   = '';
+  document.getElementById('pf_experience').value    = '0';
+  document.getElementById('pf_statut').value        = 'Ouvert';
+  document.getElementById('pf_description').value   = '';
+  document.getElementById('pf_id').readOnly         = false;
+  document.getElementById('posteFormTitle').textContent = '➕ Nouveau poste';
+  document.getElementById('posteFormPanel').style.display = 'block';
+  document.getElementById('pf_titre').focus();
+}
+
+// Pré-remplir le formulaire pour édition
+function editPoste(id) {
+  const postes = loadPostes();
+  const p = postes.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('pf_id').value            = p.id;
+  document.getElementById('pf_titre').value          = p.titre || '';
+  document.getElementById('pf_categorie').value      = p.categorie || 'cadre';
+  document.getElementById('pf_niveau').value         = p.niveau || '';
+  document.getElementById('pf_specialite').value     = p.specialite || '';
+  document.getElementById('pf_departement').value    = p.departement || '';
+  document.getElementById('pf_lieu').value           = p.lieu || '';
+  document.getElementById('pf_nb_postes').value      = p.nb_postes || '1';
+  document.getElementById('pf_date_publication').value = p.date_publication || '';
+  document.getElementById('pf_date_limite').value    = p.date_limite || '';
+  document.getElementById('pf_experience').value     = p.experience || '0';
+  document.getElementById('pf_statut').value         = p.statut || 'Ouvert';
+  document.getElementById('pf_description').value    = p.description || '';
+  document.getElementById('pf_id').readOnly          = true;
+  document.getElementById('posteFormTitle').textContent = '✏️ Modifier — ' + p.titre;
+  document.getElementById('posteFormPanel').style.display = 'block';
+  document.getElementById('posteFormPanel').scrollIntoView({ behavior:'smooth' });
+}
+
+// Sauvegarder (ajout ou modification)
+function savePoste() {
+  const id    = document.getElementById('pf_id').value.trim();
+  const titre = document.getElementById('pf_titre').value.trim();
+  const dlim  = document.getElementById('pf_date_limite').value;
+  if (!id)    { alert('L ID est obligatoire.'); return; }
+  if (!titre) { alert('Le titre est obligatoire.'); return; }
+  if (!dlim)  { alert('La date limite est obligatoire.'); return; }
+
+  const postes = loadPostes();
+  const existing = postes.findIndex(p => p.id === id);
+  const newPoste = {
+    id,
+    titre,
+    categorie:         document.getElementById('pf_categorie').value,
+    niveau:            document.getElementById('pf_niveau').value.trim(),
+    specialite:        document.getElementById('pf_specialite').value.trim(),
+    departement:       document.getElementById('pf_departement').value.trim(),
+    lieu:              document.getElementById('pf_lieu').value.trim(),
+    nb_postes:         document.getElementById('pf_nb_postes').value,
+    date_publication:  document.getElementById('pf_date_publication').value,
+    date_limite:       dlim,
+    experience:        document.getElementById('pf_experience').value,
+    statut:            document.getElementById('pf_statut').value,
+    description:       document.getElementById('pf_description').value.trim(),
+    visible:           'TRUE',
+    date_publiee:      document.getElementById('pf_date_publication').value,
+  };
+
+  if (existing >= 0) {
+    postes[existing] = newPoste;
+    alert('✅ Poste modifié avec succès !');
+  } else {
+    // Vérifier unicité ID
+    if (postes.some(p => p.id === id)) {
+      alert('❌ Cet ID existe déjà. Choisissez un autre ID.'); return;
+    }
+    postes.push(newPoste);
+    alert('✅ Nouveau poste ajouté avec succès !');
+  }
+  savePostes(postes);
+  hidePosteForm();
+  renderPostesTable();
+}
+
+function hidePosteForm() {
+  document.getElementById('posteFormPanel').style.display = 'none';
+}
+
+// Basculer statut Ouvert ↔ Clôturé
+function togglePosteStatut(id) {
+  const postes = loadPostes();
+  const p = postes.find(x => x.id === id);
+  if (!p) return;
+  p.statut = p.statut === 'Ouvert' ? 'Cloture' : 'Ouvert';
+  savePostes(postes);
+  renderPostesTable();
+}
+
+// Supprimer un poste
+function deletePoste(id) {
+  if (!confirm('Supprimer le poste ' + id + ' ? Cette action est irreversible.')) return;
+  const postes = loadPostes().filter(p => p.id !== id);
+  savePostes(postes);
+  renderPostesTable();
+  alert('✅ Poste supprimé.');
+}
+
+// Recharger depuis les données intégrées
+function importPostesFromDemo() {
+  if (!confirm('Recharger tous les postes depuis les données intégrées ? Vos modifications seront perdues.')) return;
+  localStorage.removeItem(POSTES_KEY);
+  savePostes(JSON.parse(JSON.stringify(OFFRES_DEMO)));
+  renderPostesTable();
+  alert('✅ Postes rechargés depuis les données ONHYM.');
+}
+
+// Export CSV des postes
+// Export CSV des postes
+function exportPostesCSV() {
+  var postes = loadPostes();
+  var cols = ['id','titre','categorie','niveau','specialite','departement','lieu','nb_postes','date_publication','date_limite','experience','statut','description'];
+  var lines = [cols.join(',')];
+  for (var i = 0; i < postes.length; i++) {
+    var p = postes[i];
+    var row = cols.map(function(c) {
+      var v = (p[c] || '').toString().replace(/"/g, '""');
+      return '"' + v + '"';
+    });
+    lines.push(row.join(','));
+  }
+  var csv = lines.join(String.fromCharCode(13,10));
+  var blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8;'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ONHYM_Offres_export_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+}
+
+/* ---  GESTION DES COMPTES --- */
+
+function renderAccountsTable() {
+  initDefaultAccounts();
+  const accounts = loadAccounts();
+  const tbody = document.getElementById('accountsTableBody');
+  const session = getSession();
+  const roleLabels = { admin:'🔑 Admin complet', drh:'🗂 DRH', lecture:'👁 Lecture seule' };
+
+  tbody.innerHTML = accounts.map(a => `
+    <tr>
+      <td><code>${escapeHtml(a.login)}</code></td>
+      <td>${escapeHtml(a.name)}</td>
+      <td>${roleLabels[a.role] || a.role}</td>
+      <td style="font-size:0.85em;">${a.lastLogin ? formatDate(a.lastLogin) : '—'}</td>
+      <td><span style="background:${a.active?'#e8f5e9':'#ffebee'};color:${a.active?'#2e7d32':'#c62828'};padding:3px 10px;border-radius:4px;font-size:0.82em;font-weight:600;">${a.active?'✅ Actif':'❌ Inactif'}</span></td>
+      <td>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.82em;" onclick="editAccount('${a.id}')">✏️ Modifier</button>
+        ${a.login !== (session && session.login) ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:0.82em;color:${a.active?'var(--danger)':'var(--success)'};" onclick="toggleAccount('${a.id}')">${a.active?'🔒 Désactiver':'🔓 Activer'}</button>` : '<span style="font-size:0.8em;color:var(--gray-600);">(compte actif)</span>'}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function showAddAccountModal() {
+  document.getElementById('accountEditId').value = '';
+  document.getElementById('accountModalTitle').textContent = '➕ Ajouter un compte';
+  document.getElementById('accLogin').value = '';
+  document.getElementById('accName').value = '';
+  document.getElementById('accPassword').value = '';
+  document.getElementById('accPassword').placeholder = 'Min. 8 caractères';
+  document.getElementById('accRole').value = 'drh';
+  document.getElementById('accountModal').style.display = 'block';
+}
+
+function editAccount(id) {
+  const accounts = loadAccounts();
+  const acc = accounts.find(a => a.id === id);
+  if (!acc) return;
+  document.getElementById('accountEditId').value = id;
+  document.getElementById('accountModalTitle').textContent = '✏️ Modifier le compte';
+  document.getElementById('accLogin').value = acc.login;
+  document.getElementById('accName').value = acc.name;
+  document.getElementById('accPassword').value = '';
+  document.getElementById('accPassword').placeholder = 'Laisser vide pour ne pas changer';
+  document.getElementById('accRole').value = acc.role;
+  document.getElementById('accountModal').style.display = 'block';
+}
+
+function hideAccountModal() {
+  document.getElementById('accountModal').style.display = 'none';
+}
+
+function saveAccount(e) {
+  e.preventDefault();
+  const id = document.getElementById('accountEditId').value;
+  const login = document.getElementById('accLogin').value.trim();
+  const name = document.getElementById('accName').value.trim();
+  const pwd = document.getElementById('accPassword').value;
+  const role = document.getElementById('accRole').value;
+
+  if (!id && pwd.length < 8) { alert('Le mot de passe doit contenir au moins 8 caractères.'); return; }
+
+  const accounts = loadAccounts();
+
+  // Vérifier unicité du login (sauf pour le compte en édition)
+  const duplicate = accounts.find(a => a.login === login && a.id !== id);
+  if (duplicate) { alert('Cet identifiant est déjà utilisé.'); return; }
+
+  if (id) {
+    // Mise à jour
+    const idx = accounts.findIndex(a => a.id === id);
+    if (idx >= 0) {
+      accounts[idx].login = login;
+      accounts[idx].name = name;
+      accounts[idx].role = role;
+      if (pwd) accounts[idx].pwdHash = btoa(pwd);
+    }
+  } else {
+    // Nouveau compte
+    accounts.push({
+      id: 'acc-' + Date.now(),
+      login, name, role,
+      pwdHash: btoa(pwd),
+      active: true,
+      createdAt: new Date().toISOString(),
+      lastLogin: null
+    });
+  }
+
+  saveAccounts(accounts);
+  hideAccountModal();
+  renderAccountsTable();
+  alert('✅ Compte ' + (id ? 'modifié' : 'créé') + ' avec succès.');
+}
+
+function toggleAccount(id) {
+  const accounts = loadAccounts();
+  const acc = accounts.find(a => a.id === id);
+  if (!acc) return;
+  acc.active = !acc.active;
+  saveAccounts(accounts);
+  renderAccountsTable();
 }
 
 /* -----------------------------------------------------------
